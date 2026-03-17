@@ -40,7 +40,7 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    let userId = ''
+    let channelRef: ReturnType<typeof supabase.channel> | null = null
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -50,12 +50,12 @@ export default function DashboardPage() {
         return
       }
 
-      userId = session.user.id
+      const userId = session.user.id
       setUserEmail(session.user.email ?? '')
       await fetchTransactions(userId)
       setLoading(false)
 
-      const channel = supabase
+      channelRef = supabase
         .channel('transactions-realtime')
         .on(
           'postgres_changes',
@@ -70,13 +70,15 @@ export default function DashboardPage() {
           }
         )
         .subscribe()
-
-      return () => {
-        supabase.removeChannel(channel)
-      }
     }
 
     init()
+
+    return () => {
+      if (channelRef) {
+        supabase.removeChannel(channelRef)
+      }
+    }
   }, [router, fetchTransactions])
 
   const filteredTransactions = transactions.filter((t) => {

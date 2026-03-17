@@ -36,10 +36,10 @@ export default function RegisterPage() {
     })
 
     if (authError) {
-      if (authError.message.includes('already registered')) {
-        setError('Este e-mail já está cadastrado.')
-      } else if (authError.message.includes('invalid')) {
+      if (authError.status === 422) {
         setError('E-mail inválido.')
+      } else if (authError.status === 400) {
+        setError('Este e-mail já está cadastrado.')
       } else {
         setError('Erro ao criar conta. Tente novamente.')
       }

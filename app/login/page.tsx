@@ -23,7 +23,7 @@ export default function LoginPage() {
     })
 
     if (authError) {
-      if (authError.message.includes('Invalid login credentials')) {
+      if (authError.status === 400) {
         setError('E-mail ou senha incorretos.')
       } else if (authError.message.includes('Email not confirmed')) {
         setError('Confirme seu e-mail antes de entrar.')

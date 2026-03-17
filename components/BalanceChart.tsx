@@ -115,14 +115,11 @@ export default function BalanceChart({ transactions }: BalanceChartProps) {
           color: '#6b7280',
           font: { size: 11 },
           callback: (value: number | string) => {
-            if (typeof value === 'number') {
-              return new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-                notation: 'compact',
-              }).format(value)
-            }
-            return value
+            return new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+              notation: 'compact',
+            }).format(Number(value))
           },
         },
       },

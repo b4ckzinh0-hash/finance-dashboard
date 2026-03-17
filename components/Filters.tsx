@@ -18,10 +18,12 @@ const MONTHS = [
 function generateMonthOptions() {
   const options: { value: string; label: string }[] = []
   const now = new Date()
+  const currentYear = now.getFullYear()
+  const minYear = currentYear - 1
 
   // Current year + previous year
-  for (let y = now.getFullYear(); y >= now.getFullYear() - 1; y--) {
-    const maxMonth = y === now.getFullYear() ? now.getMonth() : 11
+  for (let y = currentYear; y >= minYear; y--) {
+    const maxMonth = y === currentYear ? now.getMonth() : 11
     for (let m = maxMonth; m >= 0; m--) {
       const value = `${y}-${String(m + 1).padStart(2, '0')}`
       const label = `${MONTHS[m]} ${y}`
