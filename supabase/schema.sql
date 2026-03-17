@@ -229,8 +229,67 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   EXECUTE FUNCTION handle_new_user();
 
 -- ============================================================
--- UPDATED_AT HELPER
+-- TRANSFER BETWEEN ACCOUNTS (atomic)
 -- ============================================================
+CREATE OR REPLACE FUNCTION transfer_between_accounts(
+  p_user_id      UUID,
+  p_from_account UUID,
+  p_to_account   UUID,
+  p_amount       DECIMAL,
+  p_description  TEXT,
+  p_date         DATE
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_transfer_category_id UUID;
+BEGIN
+  -- Verify both accounts belong to the calling user
+  IF NOT EXISTS (
+    SELECT 1 FROM accounts WHERE id = p_from_account AND user_id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'Source account not found or access denied';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM accounts WHERE id = p_to_account AND user_id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'Destination account not found or access denied';
+  END IF;
+
+  -- Pick a fallback category (first 'expense' category for this user)
+  SELECT id INTO v_transfer_category_id
+  FROM categories
+  WHERE user_id = p_user_id
+  LIMIT 1;
+
+  -- Debit source account
+  UPDATE accounts
+  SET balance = balance - p_amount
+  WHERE id = p_from_account AND user_id = p_user_id;
+
+  -- Credit destination account
+  UPDATE accounts
+  SET balance = balance + p_amount
+  WHERE id = p_to_account AND user_id = p_user_id;
+
+  -- Record outgoing transfer transaction
+  INSERT INTO transactions
+    (user_id, account_id, category_id, type, amount, description, date, payment_method)
+  VALUES
+    (p_user_id, p_from_account, v_transfer_category_id, 'transfer', p_amount, p_description, p_date, 'bank_transfer');
+
+  -- Record incoming transfer transaction
+  INSERT INTO transactions
+    (user_id, account_id, category_id, type, amount, description, date, payment_method)
+  VALUES
+    (p_user_id, p_to_account, v_transfer_category_id, 'transfer', p_amount, p_description, p_date, 'bank_transfer');
+END;
+$$;
+
+
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql

@@ -20,6 +20,7 @@ export function formatDate(date: string | Date): string {
 export function getInitials(name: string): string {
   return name
     .split(' ')
+    .filter((n) => n.length > 0)
     .map((n) => n[0])
     .slice(0, 2)
     .join('')
@@ -31,5 +32,6 @@ export function getMonthName(month: number): string {
     'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
     'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
   ]
+  if (month < 0 || month > 11) throw new Error(`Invalid month index: ${month}`)
   return months[month]
 }

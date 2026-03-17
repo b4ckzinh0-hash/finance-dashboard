@@ -73,27 +73,21 @@ export function useAccounts() {
       } = await supabase.auth.getUser()
       if (!user) return { error: new Error('Not authenticated') }
 
-      const fromAccount = accounts.find((a) => a.id === fromAccountId)
-      const toAccount   = accounts.find((a) => a.id === toAccountId)
-      if (!fromAccount || !toAccount) return { error: new Error('Account not found') }
+      // Delegate to a DB function so both balance updates and transaction
+      // records are committed atomically inside a single transaction.
+      const { error } = await supabase.rpc('transfer_between_accounts', {
+        p_user_id:        user.id,
+        p_from_account:   fromAccountId,
+        p_to_account:     toAccountId,
+        p_amount:         amount,
+        p_description:    description,
+        p_date:           date,
+      })
 
-      // Update balances
-      const { error: e1 } = await supabase
-        .from('accounts')
-        .update({ balance: fromAccount.balance - amount })
-        .eq('id', fromAccountId)
-      if (e1) return { error: e1 }
-
-      const { error: e2 } = await supabase
-        .from('accounts')
-        .update({ balance: toAccount.balance + amount })
-        .eq('id', toAccountId)
-      if (e2) return { error: e2 }
-
-      await fetchAccounts()
-      return { error: null }
+      if (!error) await fetchAccounts()
+      return { error }
     },
-    [supabase, accounts, fetchAccounts]
+    [supabase, fetchAccounts]
   )
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
