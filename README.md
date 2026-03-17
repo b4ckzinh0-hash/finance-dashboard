@@ -4,7 +4,7 @@ Dashboard de finanças pessoais construído com Next.js 14, Supabase e Chart.js.
 
 ## Stack
 
-- **Next.js 14** (App Router) + TypeScript
+- **Next.js 16** (App Router) + TypeScript
 - **Tailwind CSS** (dark mode)
 - **Chart.js** + react-chartjs-2
 - **Supabase** (Auth + DB + Realtime)
