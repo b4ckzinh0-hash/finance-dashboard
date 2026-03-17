@@ -4,6 +4,8 @@ import { AuthProvider } from '@/contexts/auth-context'
 import { NotificationProvider } from '@/contexts/notification-context'
 import { Toaster } from '@/components/ui/toaster'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'FinanceApp - Controle Financeiro Pessoal',
   description: 'Sistema completo de finanças pessoais com inteligência artificial',
