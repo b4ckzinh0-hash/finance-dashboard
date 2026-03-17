@@ -9,15 +9,15 @@ interface FiltersProps {
   onCategoryChange: (category: string) => void
 }
 
+const MONTHS = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril',
+  'Maio', 'Junho', 'Julho', 'Agosto',
+  'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
 function generateMonthOptions() {
   const options: { value: string; label: string }[] = []
   const now = new Date()
-
-  const MONTHS = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril',
-    'Maio', 'Junho', 'Julho', 'Agosto',
-    'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-  ]
 
   // Current year + previous year
   for (let y = now.getFullYear(); y >= now.getFullYear() - 1; y--) {

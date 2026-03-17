@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState<string>('')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
 
@@ -85,7 +86,11 @@ export default function DashboardPage() {
   })
 
   async function handleDelete(id: string) {
-    await supabase.from('transactions').delete().eq('id', id)
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) {
+      setDeleteError('Erro ao excluir transação. Tente novamente.')
+      setTimeout(() => setDeleteError(null), 4000)
+    }
   }
 
   function handleEdit(transaction: Transaction) {
@@ -115,6 +120,16 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-950">
       <Header userEmail={userEmail} />
+
+      {/* Delete error toast */}
+      {deleteError && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-400 px-4 py-3 rounded-xl text-sm shadow-lg">
+          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {deleteError}
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <SummaryCards transactions={filteredTransactions} />

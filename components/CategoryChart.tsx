@@ -36,7 +36,7 @@ export default function CategoryChart({ transactions }: CategoryChartProps) {
       {
         data: chartData.data,
         backgroundColor: chartData.backgroundColor,
-        borderColor: chartData.backgroundColor.map((c) => c),
+        borderColor: chartData.backgroundColor,
         borderWidth: 2,
         hoverOffset: 8,
       },
