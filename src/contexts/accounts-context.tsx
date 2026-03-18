@@ -12,7 +12,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { Account } from '@/types'
 import { getOfflineAccounts } from '@/lib/offline/operations'
-import { cacheServerData } from '@/lib/offline/sync'
+import { cacheAccounts } from '@/lib/offline/sync'
 
 interface AccountsContextValue {
   accounts: Account[]
@@ -53,7 +53,7 @@ export function AccountsProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         setAccounts((data as Account[]) ?? [])
         setIsOffline(false)
-        cacheServerData().catch(() => {})
+        cacheAccounts(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineAccounts()
         setAccounts(local as Account[])

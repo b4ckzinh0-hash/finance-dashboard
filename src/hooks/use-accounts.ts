@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Account } from '@/types'
 import { getOfflineAccounts } from '@/lib/offline/operations'
-import { cacheServerData } from '@/lib/offline/sync'
+import { cacheAccounts } from '@/lib/offline/sync'
 
 export function useAccounts() {
   const supabase = useRef(createClient()).current
@@ -23,7 +23,7 @@ export function useAccounts() {
       if (!error && data) {
         setAccounts((data as Account[]) ?? [])
         setIsOffline(false)
-        cacheServerData().catch(() => {})
+        cacheAccounts(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineAccounts()
         setAccounts(local as Account[])
