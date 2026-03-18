@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { useToast } from '@/components/ui/use-toast'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
+import { NotificationSettings } from '@/components/notifications/notification-settings'
 
 export default function SettingsPage() {
   const { user, profile, signOut } = useAuth()
@@ -103,6 +104,14 @@ export default function SettingsPage() {
             </div>
             <span className="text-sm text-zinc-500 bg-zinc-800 px-2 py-1 rounded">BRL</span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Notifications */}
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardContent className="p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-white">Notificações</h2>
+          <NotificationSettings />
         </CardContent>
       </Card>
 

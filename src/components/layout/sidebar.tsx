@@ -14,6 +14,7 @@ import {
   BarChart3,
   Sparkles,
   Settings,
+  Building2,
 } from 'lucide-react'
 
 const navLinks = [
@@ -24,6 +25,7 @@ const navLinks = [
   { href: '/goals', label: 'Metas', icon: Target },
   { href: '/planning', label: 'Planejamento', icon: Calendar },
   { href: '/reports', label: 'Relatórios', icon: BarChart3 },
+  { href: '/open-finance', label: 'Open Finance', icon: Building2 },
   { href: '/insights', label: 'Insights IA', icon: Sparkles },
   { href: '/settings', label: 'Configurações', icon: Settings },
 ]
