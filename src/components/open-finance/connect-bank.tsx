@@ -5,8 +5,7 @@ import { Loader2, Building2, AlertCircle, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BankCard } from './bank-card'
 import { PluggyConnectWidget } from './pluggy-connect-widget'
-import { BelvoConnectWidget } from './belvo-connect-widget'
-import { useOpenFinance, type OpenFinanceProvider } from '@/hooks/use-open-finance'
+import { useOpenFinance } from '@/hooks/use-open-finance'
 
 /** Time (ms) after which a "taking longer than expected" hint is shown during initial load. */
 const SLOW_LOAD_HINT_MS = 5_000
@@ -39,8 +38,6 @@ export function ConnectBank() {
     connecting,
     syncing,
     pluggyConfigured,
-    belvoConfigured,
-    activeProvider,
     openConnectWidget,
     onWidgetSuccess,
     onWidgetError,
@@ -48,7 +45,6 @@ export function ConnectBank() {
     disconnectBank,
     syncBankData,
     loadItems,
-    switchProvider,
   } = useOpenFinance()
 
   const [slowLoad, setSlowLoad] = useState(false)
@@ -63,13 +59,8 @@ export function ConnectBank() {
     return () => clearTimeout(id)
   }, [loading])
 
-  const bothConfigured = pluggyConfigured && belvoConfigured
-
-  const providerLabel = activeProvider === 'belvo' ? 'Belvo' : 'Pluggy'
-  const providerUrl = activeProvider === 'belvo' ? 'https://belvo.com' : 'https://pluggy.ai'
-
   // ── Not configured ─────────────────────────────────────────────────────────
-  if (!pluggyConfigured && !belvoConfigured) {
+  if (!pluggyConfigured) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-yellow-800/50 bg-yellow-950/20 p-8 text-center">
         <AlertCircle className="h-10 w-10 text-yellow-400" />
@@ -79,30 +70,17 @@ export function ConnectBank() {
             Configure as variáveis do Pluggy (
             <code className="font-mono bg-yellow-900/40 px-1 rounded">PLUGGY_CLIENT_ID</code> e{' '}
             <code className="font-mono bg-yellow-900/40 px-1 rounded">PLUGGY_CLIENT_SECRET</code>)
-            ou do Belvo (
-            <code className="font-mono bg-yellow-900/40 px-1 rounded">BELVO_SECRET_ID</code> e{' '}
-            <code className="font-mono bg-yellow-900/40 px-1 rounded">BELVO_SECRET_PASSWORD</code>)
             nas configurações da Vercel.
           </p>
         </div>
-        <div className="flex gap-3">
-          <a
-            href="https://dashboard.pluggy.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-yellow-500 underline"
-          >
-            Dashboard Pluggy →
-          </a>
-          <a
-            href="https://dashboard.belvo.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-yellow-500 underline"
-          >
-            Dashboard Belvo →
-          </a>
-        </div>
+        <a
+          href="https://dashboard.pluggy.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-yellow-500 underline"
+        >
+          Dashboard Pluggy →
+        </a>
       </div>
     )
   }
@@ -131,7 +109,7 @@ export function ConnectBank() {
         <div>
           <p className="font-semibold text-red-300 text-lg">Erro ao carregar bancos conectados</p>
           <p className="text-sm text-red-400 mt-1">
-            Não foi possível obter a lista de bancos via {providerLabel}. Verifique sua conexão.
+            Não foi possível obter a lista de bancos via Pluggy. Verifique sua conexão.
           </p>
         </div>
         <Button
@@ -148,8 +126,8 @@ export function ConnectBank() {
 
   return (
     <div className="space-y-6">
-      {/* Connect widgets (render nothing visually — overlays managed by scripts) */}
-      {connectToken && activeProvider === 'pluggy' && (
+      {/* Connect widget (renders nothing visually — overlay managed by script) */}
+      {connectToken && (
         <PluggyConnectWidget
           connectToken={connectToken}
           onSuccess={onWidgetSuccess}
@@ -157,41 +135,13 @@ export function ConnectBank() {
           onClose={onWidgetClose}
         />
       )}
-      {connectToken && activeProvider === 'belvo' && (
-        <BelvoConnectWidget
-          connectToken={connectToken}
-          onSuccess={(linkId) => onWidgetSuccess(linkId)}
-          onError={onWidgetError}
-          onClose={onWidgetClose}
-        />
-      )}
-
-      {/* Provider selector (shown only when both are configured) */}
-      {bothConfigured && (
-        <div className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-          <span className="text-xs text-zinc-500 mr-1">Provedor:</span>
-          {(['pluggy', 'belvo'] as OpenFinanceProvider[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => switchProvider(p)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                activeProvider === p
-                  ? 'bg-violet-600 text-white'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-              }`}
-            >
-              {p === 'pluggy' ? 'Pluggy' : 'Belvo'}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Header actions */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-zinc-400">
           {connectedBanks.length === 0
             ? 'Nenhum banco conectado. Clique em "Conectar Banco" para começar.'
-            : `${connectedBanks.length} banco(s) conectado(s) via ${providerLabel} Open Finance.`}
+            : `${connectedBanks.length} banco(s) conectado(s) via Pluggy Open Finance.`}
         </p>
         <div className="flex gap-2">
           <Button
@@ -265,12 +215,12 @@ export function ConnectBank() {
       <p className="text-center text-xs text-zinc-600">
         Conexões seguras via{' '}
         <a
-          href={providerUrl}
+          href="https://pluggy.ai"
           target="_blank"
           rel="noopener noreferrer"
           className="text-zinc-500 underline"
         >
-          {providerLabel}
+          Pluggy
         </a>{' '}
         · Open Finance Brasil · Dados somente leitura
       </p>
