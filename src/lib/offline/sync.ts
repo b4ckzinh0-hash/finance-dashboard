@@ -52,6 +52,31 @@ export async function syncWithServer(): Promise<{ synced: number; errors: number
   return { synced, errors }
 }
 
+async function cacheStoreData(
+  store: 'transactions' | 'accounts' | 'categories',
+  data: Record<string, unknown>[]
+): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction(store, 'readwrite')
+  await tx.store.clear()
+  for (const item of data) {
+    tx.store.put({ ...item, _synced: true })
+  }
+  await tx.done
+}
+
+export function cacheTransactions(data: Record<string, unknown>[]): Promise<void> {
+  return cacheStoreData('transactions', data)
+}
+
+export function cacheAccounts(data: Record<string, unknown>[]): Promise<void> {
+  return cacheStoreData('accounts', data)
+}
+
+export function cacheCategories(data: Record<string, unknown>[]): Promise<void> {
+  return cacheStoreData('categories', data)
+}
+
 export async function cacheServerData(): Promise<void> {
   const db = await getDB()
   const supabase = createClient()

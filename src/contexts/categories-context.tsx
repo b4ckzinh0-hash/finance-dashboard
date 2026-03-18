@@ -12,7 +12,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { Category } from '@/types'
 import { getOfflineCategories } from '@/lib/offline/operations'
-import { cacheServerData } from '@/lib/offline/sync'
+import { cacheCategories } from '@/lib/offline/sync'
 
 interface CategoriesContextValue {
   categories: Category[]
@@ -43,7 +43,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         setCategories((data as Category[]) ?? [])
         setIsOffline(false)
-        cacheServerData().catch(() => {})
+        cacheCategories(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineCategories()
         setCategories(local as Category[])

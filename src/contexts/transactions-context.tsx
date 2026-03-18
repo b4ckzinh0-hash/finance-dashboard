@@ -17,7 +17,7 @@ import {
   updateOfflineTransaction,
   deleteOfflineTransaction,
 } from '@/lib/offline/operations'
-import { cacheServerData } from '@/lib/offline/sync'
+import { cacheTransactions } from '@/lib/offline/sync'
 
 interface TransactionsContextValue {
   transactions: Transaction[]
@@ -54,7 +54,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         setTransactions((data as Transaction[]) ?? [])
         setIsOffline(false)
         // Cache to IndexedDB in the background
-        cacheServerData().catch(() => {})
+        cacheTransactions(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineTransactions()
         setTransactions(local as Transaction[])

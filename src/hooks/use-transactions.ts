@@ -9,7 +9,7 @@ import {
   updateOfflineTransaction,
   deleteOfflineTransaction,
 } from '@/lib/offline/operations'
-import { cacheServerData } from '@/lib/offline/sync'
+import { cacheTransactions } from '@/lib/offline/sync'
 
 export function useTransactions() {
   const supabase = useRef(createClient()).current
@@ -28,7 +28,7 @@ export function useTransactions() {
         setTransactions((data as Transaction[]) ?? [])
         setIsOffline(false)
         // Cache to IndexedDB in the background
-        cacheServerData().catch(() => {})
+        cacheTransactions(data as Record<string, unknown>[]).catch(() => {})
       } else {
         // Network request failed — fall back to local cache
         const local = await getOfflineTransactions()
