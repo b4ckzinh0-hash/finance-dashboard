@@ -1,136 +1,163 @@
 'use client'
 
-import { useState } from 'react'
-import { Shield, Info } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { Loader2, Building2, AlertCircle, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BankCard } from './bank-card'
-import { getAllBanks } from '@/lib/open-finance/registry'
+import { PluggyConnectWidget } from './pluggy-connect-widget'
 import { useOpenFinance } from '@/hooks/use-open-finance'
 
 export function ConnectBank() {
   const {
     connectedBanks,
+    connectToken,
+    loading,
     connecting,
     syncing,
-    connectBank,
+    pluggyConfigured,
+    openConnectWidget,
+    onWidgetSuccess,
+    onWidgetError,
+    onWidgetClose,
     disconnectBank,
-    syncBankTransactions,
-    isConnected,
+    syncBankData,
+    loadItems,
   } = useOpenFinance()
 
-  const [consentBankId, setConsentBankId] = useState<string | null>(null)
-  const allBanks = getAllBanks()
-
-  const handleConnectRequest = (bankId: string) => {
-    setConsentBankId(bankId)
+  // ── Not configured ─────────────────────────────────────────────────────────
+  if (!pluggyConfigured) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-yellow-800/50 bg-yellow-950/20 p-8 text-center">
+        <AlertCircle className="h-10 w-10 text-yellow-400" />
+        <div>
+          <p className="font-semibold text-yellow-300 text-lg">Pluggy não configurado</p>
+          <p className="text-sm text-yellow-400 mt-1 max-w-sm">
+            Configure as variáveis{' '}
+            <code className="font-mono bg-yellow-900/40 px-1 rounded">PLUGGY_CLIENT_ID</code> e{' '}
+            <code className="font-mono bg-yellow-900/40 px-1 rounded">PLUGGY_CLIENT_SECRET</code>{' '}
+            nas configurações da Vercel para habilitar o Open Finance.
+          </p>
+        </div>
+        <a
+          href="https://dashboard.pluggy.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-yellow-500 underline"
+        >
+          Acessar dashboard Pluggy →
+        </a>
+      </div>
+    )
   }
 
-  const handleConsentConfirm = async () => {
-    if (!consentBankId) return
-    setConsentBankId(null)
-    await connectBank(consentBankId)
+  // ── Loading ─────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
+      </div>
+    )
   }
-
-  const consentBank = consentBankId ? allBanks.find((b) => b.id === consentBankId) : null
 
   return (
     <div className="space-y-6">
-      {/* Info banner */}
-      <div className="flex items-start gap-3 rounded-xl border border-blue-800/50 bg-blue-950/20 p-4">
-        <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
-        <div>
-          <p className="text-sm font-medium text-blue-300">Open Finance (Simulado)</p>
-          <p className="text-xs text-blue-400 mt-1">
-            Esta é uma demonstração com dados simulados. Nenhuma conexão real é estabelecida com
-            os bancos. Em produção, utilizaria o protocolo Open Finance Brasil.
-          </p>
+      {/* Pluggy Connect widget (renders nothing visually — overlay managed by script) */}
+      {connectToken && (
+        <PluggyConnectWidget
+          connectToken={connectToken}
+          onSuccess={onWidgetSuccess}
+          onError={onWidgetError}
+          onClose={onWidgetClose}
+        />
+      )}
+
+      {/* Header actions */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-zinc-400">
+          {connectedBanks.length === 0
+            ? 'Nenhum banco conectado. Clique em "Conectar Banco" para começar.'
+            : `${connectedBanks.length} banco(s) conectado(s) via Pluggy Open Finance.`}
+        </p>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-zinc-700 text-zinc-300 gap-1"
+            onClick={loadItems}
+            disabled={loading}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Atualizar
+          </Button>
+          <Button
+            size="sm"
+            className="bg-violet-600 hover:bg-violet-700 gap-2"
+            onClick={() => openConnectWidget()}
+            disabled={connecting}
+          >
+            {connecting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            Conectar Banco
+          </Button>
         </div>
       </div>
 
-      {/* Bank grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {allBanks.map((bank) => {
-          const connection = connectedBanks.find((c) => c.bankId === bank.id)
-          return (
+      {/* Connected banks grid */}
+      {connectedBanks.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {connectedBanks.map((bank) => (
             <BankCard
-              key={bank.id}
+              key={bank.itemId}
               bank={bank}
-              connection={connection}
-              onConnect={handleConnectRequest}
               onDisconnect={disconnectBank}
-              onSync={syncBankTransactions}
-              connecting={connecting === bank.id}
-              syncing={syncing === bank.id}
+              onSync={syncBankData}
+              onReconnect={(itemId) => openConnectWidget(itemId)}
+              syncing={syncing === bank.itemId}
             />
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      ) : (
+        /* Empty state */
+        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/50 py-16">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-900/30">
+            <Building2 className="h-8 w-8 text-violet-400" />
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-white">Nenhum banco conectado</p>
+            <p className="text-sm text-zinc-400 mt-1">
+              Conecte seu banco para importar transações e saldos reais.
+            </p>
+          </div>
+          <Button
+            className="bg-violet-600 hover:bg-violet-700 gap-2 mt-2"
+            onClick={() => openConnectWidget()}
+            disabled={connecting}
+          >
+            {connecting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            Conectar meu primeiro banco
+          </Button>
+        </div>
+      )}
 
-      {/* Consent dialog */}
-      <Dialog open={!!consentBankId} onOpenChange={(o) => !o && setConsentBankId(null)}>
-        <DialogContent className="bg-zinc-900 border-zinc-700 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <Shield className="h-5 w-5 text-violet-400" />
-              Autorização de Acesso
-            </DialogTitle>
-          </DialogHeader>
-
-          {consentBank && (
-            <div className="space-y-4">
-              <p className="text-sm text-zinc-300">
-                Você está prestes a conectar o{' '}
-                <span className="font-semibold text-white">{consentBank.name}</span> ao Finance
-                Dashboard.
-              </p>
-
-              <div className="rounded-lg bg-zinc-800 p-3 space-y-2">
-                <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
-                  Dados que serão acessados:
-                </p>
-                <ul className="space-y-1">
-                  {consentBank.supportedFeatures.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-zinc-300">
-                      <span className="text-emerald-400">✓</span>
-                      {f === 'accounts' && 'Informações de contas e saldos'}
-                      {f === 'transactions' && 'Histórico de transações (60 dias)'}
-                      {f === 'credit_cards' && 'Faturas e limites de cartão de crédito'}
-                      {f === 'investments' && 'Posição de investimentos'}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <p className="text-xs text-zinc-500">
-                O acesso é somente leitura. Você pode revogar a qualquer momento.
-              </p>
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              className="border-zinc-700 text-zinc-300"
-              onClick={() => setConsentBankId(null)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="bg-violet-600 hover:bg-violet-700"
-              onClick={handleConsentConfirm}
-            >
-              Autorizar acesso
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Pluggy attribution */}
+      <p className="text-center text-xs text-zinc-600">
+        Conexões seguras via{' '}
+        <a
+          href="https://pluggy.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-500 underline"
+        >
+          Pluggy
+        </a>{' '}
+        · Open Finance Brasil · Dados somente leitura
+      </p>
     </div>
   )
 }

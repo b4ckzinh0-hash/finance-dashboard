@@ -1,129 +1,218 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import {
-  connectBankSimulated,
-  fetchBankTransactions,
-  type OpenFinanceAccount,
-  type OpenFinanceTransaction,
-} from '@/lib/open-finance/client'
+import { useState, useCallback, useEffect } from 'react'
+import type { PluggyItem, PluggyAccount, PluggyTransaction } from '@/lib/open-finance/pluggy-types'
 import { useToast } from '@/components/ui/use-toast'
 
-const STORAGE_KEY = 'open_finance_connections'
-
 export interface ConnectedBank {
-  bankId: string
-  bankName: string
-  consentId: string
+  itemId: string
+  connectorName: string
+  connectorImageUrl?: string
+  connectorPrimaryColor?: string
+  status: PluggyItem['status']
   connectedAt: string
-  accounts: OpenFinanceAccount[]
-}
-
-function loadConnections(): ConnectedBank[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function saveConnections(connections: ConnectedBank[]) {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(connections))
+  updatedAt: string
+  accounts: PluggyAccount[]
 }
 
 export function useOpenFinance() {
-  const [connectedBanks, setConnectedBanks] = useState<ConnectedBank[]>(() => loadConnections())
-  const [connecting, setConnecting] = useState<string | null>(null)
+  const [connectedBanks, setConnectedBanks] = useState<ConnectedBank[]>([])
+  const [transactions, setTransactions] = useState<PluggyTransaction[]>([])
+  const [connectToken, setConnectToken] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState<string | null>(null)
-  const [syncedTransactions, setSyncedTransactions] = useState<OpenFinanceTransaction[]>([])
+  const [pluggyConfigured, setPluggyConfigured] = useState(true)
   const { toast } = useToast()
 
-  const connectBank = useCallback(async (bankId: string) => {
-    setConnecting(bankId)
+  // ── Load connected items from Pluggy ────────────────────────────────────────
+
+  const loadItems = useCallback(async () => {
+    setLoading(true)
     try {
-      const result = await connectBankSimulated(bankId)
-      const newConnection: ConnectedBank = {
-        bankId: result.bank.id,
-        bankName: result.bank.name,
-        consentId: result.consentId,
-        connectedAt: new Date().toISOString(),
-        accounts: result.accounts,
+      const res = await fetch('/api/pluggy/items')
+
+      if (res.status === 503) {
+        setPluggyConfigured(false)
+        return
       }
 
-      setConnectedBanks((prev) => {
-        const filtered = prev.filter((c) => c.bankId !== bankId)
-        const next = [...filtered, newConnection]
-        saveConnections(next)
-        return next
-      })
+      if (!res.ok) throw new Error('Falha ao carregar bancos conectados')
 
-      toast({
-        title: `✅ ${result.bank.name} conectado!`,
-        description: `${result.accounts.length} conta(s) encontrada(s).`,
-      })
+      const items: PluggyItem[] = await res.json()
+
+      // Fetch accounts for each connected item in parallel
+      const banksWithAccounts = await Promise.all(
+        items.map(async (item) => {
+          const accRes = await fetch(`/api/pluggy/accounts?itemId=${item.id}`)
+          const accounts: PluggyAccount[] = accRes.ok ? await accRes.json() : []
+          return {
+            itemId: item.id,
+            connectorName: item.connector.name,
+            connectorImageUrl: item.connector.imageUrl,
+            connectorPrimaryColor: item.connector.primaryColor,
+            status: item.status,
+            connectedAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            accounts,
+          } satisfies ConnectedBank
+        })
+      )
+
+      setConnectedBanks(banksWithAccounts)
     } catch (err) {
-      console.error(err)
-      toast({ title: 'Erro ao conectar banco', variant: 'destructive' })
+      console.error('[useOpenFinance] loadItems:', err)
+      toast({ title: 'Erro ao carregar bancos conectados', variant: 'destructive' })
     } finally {
-      setConnecting(null)
+      setLoading(false)
     }
   }, [toast])
 
-  const disconnectBank = useCallback((bankId: string) => {
-    setConnectedBanks((prev) => {
-      const next = prev.filter((c) => c.bankId !== bankId)
-      saveConnections(next)
-      return next
-    })
-    setSyncedTransactions((prev) => prev.filter((t) => t.bankId !== bankId))
-    toast({ title: 'Banco desconectado.' })
-  }, [toast])
+  useEffect(() => {
+    loadItems()
+  }, [loadItems])
 
-  const syncBankTransactions = useCallback(async (bankId: string) => {
-    const connection = connectedBanks.find((c) => c.bankId === bankId)
-    if (!connection) return
+  // ── Open the Pluggy Connect widget ──────────────────────────────────────────
 
-    setSyncing(bankId)
-    try {
-      const allTxs: OpenFinanceTransaction[] = []
-      for (const account of connection.accounts) {
-        const txs = await fetchBankTransactions(bankId, account.id, 15)
-        allTxs.push(...txs)
+  const openConnectWidget = useCallback(
+    async (itemId?: string) => {
+      setConnecting(true)
+      try {
+        const res = await fetch('/api/pluggy/connect-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(itemId ? { itemId } : {}),
+        })
+
+        if (!res.ok) throw new Error('Falha ao obter token de conexão')
+
+        const { accessToken } = await res.json()
+        setConnectToken(accessToken)
+      } catch (err) {
+        console.error('[useOpenFinance] openConnectWidget:', err)
+        toast({ title: 'Erro ao abrir widget de conexão', variant: 'destructive' })
+        setConnecting(false)
       }
+    },
+    [toast]
+  )
 
-      setSyncedTransactions((prev) => {
-        const filtered = prev.filter((t) => t.bankId !== bankId)
-        return [...filtered, ...allTxs]
-      })
+  const closeConnectWidget = useCallback(() => {
+    setConnectToken(null)
+    setConnecting(false)
+  }, [])
 
+  // ── Handle successful widget connection ─────────────────────────────────────
+
+  const onWidgetSuccess = useCallback(
+    async (itemId: string) => {
+      setConnectToken(null)
+      setConnecting(false)
+      toast({ title: '🔄 Importando dados bancários...' })
+      await loadItems()
       toast({
-        title: `🔄 ${connection.bankName} sincronizado!`,
-        description: `${allTxs.length} transação(ões) importada(s).`,
+        title: '✅ Banco conectado com sucesso!',
+        description: `Item ${itemId} importado.`,
       })
-    } catch (err) {
-      console.error(err)
-      toast({ title: 'Erro ao sincronizar transações', variant: 'destructive' })
-    } finally {
-      setSyncing(null)
-    }
-  }, [connectedBanks, toast])
+    },
+    [loadItems, toast]
+  )
 
-  const isConnected = useCallback(
-    (bankId: string) => connectedBanks.some((c) => c.bankId === bankId),
-    [connectedBanks]
+  const onWidgetError = useCallback(
+    (error: { message: string; data?: unknown }) => {
+      console.error('[useOpenFinance] widget error:', error)
+      setConnectToken(null)
+      setConnecting(false)
+      toast({ title: 'Erro ao conectar banco', description: error.message, variant: 'destructive' })
+    },
+    [toast]
+  )
+
+  const onWidgetClose = useCallback(() => {
+    setConnectToken(null)
+    setConnecting(false)
+  }, [])
+
+  // ── Disconnect a bank ───────────────────────────────────────────────────────
+
+  const disconnectBank = useCallback(
+    async (itemId: string) => {
+      try {
+        const res = await fetch(`/api/pluggy/items/${itemId}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Falha ao desconectar banco')
+
+        setConnectedBanks((prev) => prev.filter((b) => b.itemId !== itemId))
+        toast({ title: 'Banco desconectado.' })
+      } catch (err) {
+        console.error('[useOpenFinance] disconnectBank:', err)
+        toast({ title: 'Erro ao desconectar banco', variant: 'destructive' })
+      }
+    },
+    [toast]
+  )
+
+  // ── Sync real data from a connected bank ────────────────────────────────────
+
+  const syncBankData = useCallback(
+    async (itemId: string) => {
+      setSyncing(itemId)
+      const bank = connectedBanks.find((b) => b.itemId === itemId)
+
+      try {
+        // Refresh accounts
+        const accRes = await fetch(`/api/pluggy/accounts?itemId=${itemId}`)
+        if (!accRes.ok) throw new Error('Falha ao buscar contas')
+        const accounts: PluggyAccount[] = await accRes.json()
+
+        setConnectedBanks((prev) =>
+          prev.map((b) => (b.itemId === itemId ? { ...b, accounts } : b))
+        )
+
+        // Fetch transactions for all accounts
+        const allTxs: PluggyTransaction[] = []
+        for (const account of accounts) {
+          const txRes = await fetch(`/api/pluggy/transactions?accountId=${account.id}`)
+          if (txRes.ok) {
+            const txs: PluggyTransaction[] = await txRes.json()
+            allTxs.push(...txs)
+          }
+        }
+
+        // Replace transactions for this item's accounts
+        setTransactions((prev) => {
+          const accountIds = new Set(accounts.map((a) => a.id))
+          return [...prev.filter((t) => !accountIds.has(t.accountId)), ...allTxs]
+        })
+
+        toast({
+          title: `🔄 ${bank?.connectorName ?? 'Banco'} sincronizado!`,
+          description: `${allTxs.length} transação(ões) importada(s).`,
+        })
+      } catch (err) {
+        console.error('[useOpenFinance] syncBankData:', err)
+        toast({ title: 'Erro ao sincronizar dados bancários', variant: 'destructive' })
+      } finally {
+        setSyncing(null)
+      }
+    },
+    [connectedBanks, toast]
   )
 
   return {
     connectedBanks,
-    syncedTransactions,
+    transactions,
+    connectToken,
+    loading,
     connecting,
     syncing,
-    connectBank,
+    pluggyConfigured,
+    openConnectWidget,
+    closeConnectWidget,
+    onWidgetSuccess,
+    onWidgetError,
+    onWidgetClose,
     disconnectBank,
-    syncBankTransactions,
-    isConnected,
+    syncBankData,
+    loadItems,
   }
 }

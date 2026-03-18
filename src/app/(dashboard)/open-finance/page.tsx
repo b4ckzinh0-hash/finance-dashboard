@@ -17,7 +17,7 @@ export default function OpenFinancePage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Open Finance</h1>
           <p className="text-sm text-zinc-400">
-            Conecte seus bancos e importe transações automaticamente.
+            Conecte seus bancos reais e importe transações automaticamente via Pluggy.
           </p>
         </div>
       </div>
