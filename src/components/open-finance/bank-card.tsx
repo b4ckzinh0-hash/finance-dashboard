@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { ConnectedBank } from '@/hooks/use-open-finance'
 import type { PluggyAccount } from '@/lib/open-finance/pluggy-types'
-import type { BelvoAccount } from '@/lib/open-finance/belvo-types'
 
 interface BankCardProps {
   bank: ConnectedBank
@@ -69,25 +68,18 @@ const statusConfig: Record<
   },
 }
 
-// ── Normalize account fields from Pluggy or Belvo ──────────────────────────────
+// ── Account helpers ────────────────────────────────────────────────────────────
 
-function isPluggyAccount(acc: PluggyAccount | BelvoAccount): acc is PluggyAccount {
-  return 'itemId' in acc
+function getAccountSubtype(acc: PluggyAccount): string {
+  return acc.subtype
 }
 
-function getAccountSubtype(acc: PluggyAccount | BelvoAccount): string {
-  if (isPluggyAccount(acc)) return acc.subtype
-  return acc.category
+function getAccountBalance(acc: PluggyAccount): number {
+  return acc.balance
 }
 
-function getAccountBalance(acc: PluggyAccount | BelvoAccount): number {
-  if (isPluggyAccount(acc)) return acc.balance
-  return acc.balance?.current ?? 0
-}
-
-function isDepositAccount(acc: PluggyAccount | BelvoAccount): boolean {
-  if (isPluggyAccount(acc)) return acc.type === 'BANK'
-  return acc.category !== 'CREDIT_CARD' && acc.category !== 'LOAN_ACCOUNT'
+function isDepositAccount(acc: PluggyAccount): boolean {
+  return acc.type === 'BANK'
 }
 
 export function BankCard({ bank, onDisconnect, onSync, onReconnect, syncing }: BankCardProps) {
