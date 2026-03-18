@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import {
   BarChart,
   Bar,
@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactionsContext } from '@/contexts/transactions-context'
+import { useTransactionsContext } from '@/contexts/data-provider'
 import { formatCurrency, getMonthName } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 
@@ -41,7 +41,7 @@ function CustomTooltip({
   return null
 }
 
-export function MonthlyBarChart() {
+export const MonthlyBarChart = memo(function MonthlyBarChart() {
   const { transactions, loading } = useTransactionsContext()
 
   const data = useMemo(() => {
@@ -114,4 +114,4 @@ export function MonthlyBarChart() {
       </CardContent>
     </Card>
   )
-}
+})

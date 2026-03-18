@@ -78,7 +78,7 @@ async function fetchWithRetry(
     const res = await fetch(url, { ...options, signal: controller.signal })
     return res
   } catch (err) {
-    if (retries > 0 && !(err instanceof Error && err.name === 'AbortError')) {
+    if (retries > 0) {
       const delay = RETRY_BASE_DELAY_MS * (MAX_RETRIES - retries + 1)
       await new Promise((resolve) => setTimeout(resolve, delay))
       return fetchWithRetry(url, options, retries - 1)

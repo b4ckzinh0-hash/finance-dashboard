@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import {
   LineChart,
   Line,
@@ -12,8 +12,8 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactionsContext } from '@/contexts/transactions-context'
-import { useAccountsContext } from '@/contexts/accounts-context'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useAccountsContext } from '@/contexts/data-provider'
 import { formatCurrency, getMonthName } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 
@@ -37,7 +37,7 @@ function CustomTooltip({
   return null
 }
 
-export function BalanceLineChart() {
+export const BalanceLineChart = memo(function BalanceLineChart() {
   const { transactions, loading: txLoading } = useTransactionsContext()
   const { totalBalance, loading: accLoading } = useAccountsContext()
   const loading = txLoading || accLoading
@@ -127,4 +127,4 @@ export function BalanceLineChart() {
       </CardContent>
     </Card>
   )
-}
+})

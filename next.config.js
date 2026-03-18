@@ -32,6 +32,9 @@ const withPWA = require('next-pwa')({
 })
 
 const nextConfig = {
+  reactStrictMode: true,
+  poweredByHeader: false,
+  compress: true,
   images: {
     remotePatterns: [
       {
