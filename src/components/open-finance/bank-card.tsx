@@ -4,6 +4,8 @@ import { Loader2, CheckCircle2, Link2Off, RefreshCw, AlertTriangle, Clock } from
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { ConnectedBank } from '@/hooks/use-open-finance'
+import type { PluggyAccount } from '@/lib/open-finance/pluggy-types'
+import type { BelvoAccount } from '@/lib/open-finance/belvo-types'
 
 interface BankCardProps {
   bank: ConnectedBank
@@ -18,6 +20,11 @@ const subtypeLabels: Record<string, string> = {
   SAVINGS_ACCOUNT: 'Poupança',
   CREDIT_CARD: 'Cartão de Crédito',
   INVESTMENT: 'Investimentos',
+  INVESTMENT_ACCOUNT: 'Investimentos',
+  LOAN_ACCOUNT: 'Empréstimo',
+  PENSION_FUND_ACCOUNT: 'Previdência',
+  BUSINESS_CHECKING_ACCOUNT: 'Conta Empresarial',
+  UNCATEGORIZED: 'Outro',
 }
 
 const statusConfig: Record<
@@ -62,12 +69,33 @@ const statusConfig: Record<
   },
 }
 
+// ── Normalize account fields from Pluggy or Belvo ──────────────────────────────
+
+function isPluggyAccount(acc: PluggyAccount | BelvoAccount): acc is PluggyAccount {
+  return 'itemId' in acc
+}
+
+function getAccountSubtype(acc: PluggyAccount | BelvoAccount): string {
+  if (isPluggyAccount(acc)) return acc.subtype
+  return acc.category
+}
+
+function getAccountBalance(acc: PluggyAccount | BelvoAccount): number {
+  if (isPluggyAccount(acc)) return acc.balance
+  return acc.balance?.current ?? 0
+}
+
+function isDepositAccount(acc: PluggyAccount | BelvoAccount): boolean {
+  if (isPluggyAccount(acc)) return acc.type === 'BANK'
+  return acc.category !== 'CREDIT_CARD' && acc.category !== 'LOAN_ACCOUNT'
+}
+
 export function BankCard({ bank, onDisconnect, onSync, onReconnect, syncing }: BankCardProps) {
   const status = statusConfig[bank.status] ?? statusConfig['UPDATED']
   const primaryColor = bank.connectorPrimaryColor ?? '#6d28d9'
   const totalBalance = bank.accounts
-    .filter((a) => a.type === 'BANK')
-    .reduce((sum, a) => sum + a.balance, 0)
+    .filter(isDepositAccount)
+    .reduce((sum, a) => sum + getAccountBalance(a), 0)
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -114,7 +142,7 @@ export function BankCard({ bank, onDisconnect, onSync, onReconnect, syncing }: B
         <div className="flex flex-wrap gap-1">
           {bank.accounts.map((acc) => (
             <Badge key={acc.id} variant="outline" className="text-[10px] border-zinc-700 text-zinc-400">
-              {subtypeLabels[acc.subtype] ?? acc.subtype}
+              {subtypeLabels[getAccountSubtype(acc)] ?? getAccountSubtype(acc)}
             </Badge>
           ))}
         </div>
@@ -125,11 +153,13 @@ export function BankCard({ bank, onDisconnect, onSync, onReconnect, syncing }: B
         <div className="rounded-lg bg-zinc-800/50 p-2 space-y-1">
           {bank.accounts.map((acc) => (
             <div key={acc.id} className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">{subtypeLabels[acc.subtype] ?? acc.subtype}</span>
-              <span className="text-white font-medium">{formatCurrency(acc.balance)}</span>
+              <span className="text-zinc-400">
+                {subtypeLabels[getAccountSubtype(acc)] ?? getAccountSubtype(acc)}
+              </span>
+              <span className="text-white font-medium">{formatCurrency(getAccountBalance(acc))}</span>
             </div>
           ))}
-          {bank.accounts.filter((a) => a.type === 'BANK').length > 1 && (
+          {bank.accounts.filter(isDepositAccount).length > 1 && (
             <div className="flex items-center justify-between text-xs border-t border-zinc-700 pt-1 mt-1">
               <span className="text-zinc-400 font-medium">Total</span>
               <span className="text-emerald-400 font-semibold">{formatCurrency(totalBalance)}</span>

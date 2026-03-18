@@ -84,7 +84,7 @@ export default function GoalList({ onEdit }: GoalListProps) {
       <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 py-16 text-center">
         <p className="text-4xl mb-3">🎯</p>
         <p className="text-zinc-400">Nenhuma meta cadastrada.</p>
-        <p className="text-sm text-zinc-500 mt-1">Clique em "Nova Meta" para começar.</p>
+        <p className="text-sm text-zinc-500 mt-1">Clique em &quot;Nova Meta&quot; para começar.</p>
       </div>
     )
   }

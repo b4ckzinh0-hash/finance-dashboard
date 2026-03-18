@@ -60,7 +60,8 @@ async function cacheStoreData(
   const tx = db.transaction(store, 'readwrite')
   await tx.store.clear()
   for (const item of data) {
-    tx.store.put({ ...item, _synced: true })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx.store.put({ ...item, _synced: true } as any)
   }
   await tx.done
 }

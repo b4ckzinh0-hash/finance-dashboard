@@ -64,7 +64,7 @@ interface TransactionListProps {
 
 export function TransactionList({ onEdit }: TransactionListProps) {
   const searchParams = useSearchParams()
-  const { transactions, loading, filterTransactions, deleteTransaction } = useTransactions()
+  const { loading, filterTransactions, deleteTransaction } = useTransactions()
   const { toast } = useToast()
 
   const [deletingId, setDeletingId] = useState<string | null>(null)

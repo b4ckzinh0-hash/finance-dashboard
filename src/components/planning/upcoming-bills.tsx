@@ -31,7 +31,8 @@ export default function UpcomingBills({ onMarkPaid }: UpcomingBillsProps) {
   }).sort((a, b) => new Date(a.next_due_date).getTime() - new Date(b.next_due_date).getTime())
 
   async function handleMarkPaid(expense: typeof upcoming[0]) {
-    const account = accounts.find((a) => a.id === expense.account_id)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _account = accounts.find((a) => a.id === expense.account_id)
     const { error } = await addTransaction({
       account_id: expense.account_id,
       category_id: expense.category_id,

@@ -48,7 +48,7 @@ export default function AccountList({ onEdit }: AccountListProps) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 py-16 text-center">
         <p className="text-zinc-400">Nenhuma conta cadastrada.</p>
-        <p className="text-sm text-zinc-500 mt-1">Clique em "Nova Conta" para adicionar.</p>
+        <p className="text-sm text-zinc-500 mt-1">Clique em &quot;Nova Conta&quot; para adicionar.</p>
       </div>
     )
   }
