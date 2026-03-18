@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTransactions } from '@/hooks/use-transactions'
 import { useCategories } from '@/hooks/use-categories'
 import { formatCurrency, getMonthName } from '@/lib/utils'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
@@ -90,7 +91,10 @@ export default function ReportsPage() {
       transition={{ duration: 0.4 }}
       className="space-y-6"
     >
-      <h1 className="text-2xl font-bold text-white">Relatórios</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Relatórios</h1>
+        <ExportButtons />
+      </div>
 
       <Tabs defaultValue="monthly">
         <TabsList className="bg-zinc-800">
