@@ -4,10 +4,10 @@ import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertTriangle, DollarSign, Calendar } from 'lucide-react'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useAccounts } from '@/hooks/use-accounts'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useAccountsContext } from '@/contexts/data-provider'
 import { usePlanning } from '@/hooks/use-planning'
-import { useCategories } from '@/hooks/use-categories'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -19,10 +19,10 @@ interface Alert {
 }
 
 export default function SmartAlerts() {
-  const { transactions, loading: txLoading } = useTransactions()
-  const { totalBalance, loading: accLoading } = useAccounts()
+  const { transactions, loading: txLoading } = useTransactionsContext()
+  const { totalBalance, loading: accLoading } = useAccountsContext()
   const { recurringExpenses, loading: planLoading } = usePlanning()
-  const { categories, loading: catLoading } = useCategories()
+  const { categories, loading: catLoading } = useCategoriesContext()
 
   const loading = txLoading || accLoading || planLoading || catLoading
 

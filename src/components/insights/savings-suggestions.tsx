@@ -3,13 +3,13 @@
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useCategories } from '@/hooks/use-categories'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { formatCurrency } from '@/lib/utils'
 
 export default function SavingsSuggestions() {
-  const { transactions, loading: txLoading } = useTransactions()
-  const { categories, loading: catLoading } = useCategories()
+  const { transactions, loading: txLoading } = useTransactionsContext()
+  const { categories, loading: catLoading } = useCategoriesContext()
 
   const loading = txLoading || catLoading
 

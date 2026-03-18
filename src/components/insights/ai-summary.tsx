@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactions } from '@/hooks/use-transactions'
+import { useTransactionsContext } from '@/contexts/data-provider'
 import { useGoals } from '@/hooks/use-goals'
 import { formatCurrency } from '@/lib/utils'
 
@@ -38,7 +38,7 @@ function ScoreGauge({ score }: { score: number }) {
 }
 
 export default function AiSummary() {
-  const { transactions, loading: txLoading } = useTransactions()
+  const { transactions, loading: txLoading } = useTransactionsContext()
   const { activeGoals, loading: goalsLoading } = useGoals()
 
   const loading = txLoading || goalsLoading

@@ -9,9 +9,9 @@ import {
   notifyBudgetAlert,
   notifyLowBalance,
 } from '@/lib/notifications/push'
-import { useTransactions } from './use-transactions'
-import { useAccounts } from './use-accounts'
-import { useCategories } from './use-categories'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useAccountsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { usePlanning } from './use-planning'
 
 const PREFS_KEY = 'push_notification_prefs'
@@ -53,9 +53,9 @@ export function usePushNotifications() {
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const [supported] = useState(() => isPushSupported())
 
-  const { transactions } = useTransactions()
-  const { accounts } = useAccounts()
-  const { categories } = useCategories()
+  const { transactions } = useTransactionsContext()
+  const { accounts } = useAccountsContext()
+  const { categories } = useCategoriesContext()
   const { recurringExpenses } = usePlanning()
 
   useEffect(() => {

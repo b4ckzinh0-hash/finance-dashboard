@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Category } from '@/types'
 import { getOfflineCategories } from '@/lib/offline/operations'
-import { cacheServerData } from '@/lib/offline/sync'
+import { cacheCategories } from '@/lib/offline/sync'
 
 export function useCategories() {
   const supabase = useRef(createClient()).current
@@ -19,7 +19,7 @@ export function useCategories() {
       if (!error && data) {
         setCategories((data as Category[]) ?? [])
         setIsOffline(false)
-        cacheServerData().catch(() => {})
+        cacheCategories(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineCategories()
         setCategories(local as Category[])

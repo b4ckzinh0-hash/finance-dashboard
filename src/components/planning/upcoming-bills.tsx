@@ -4,8 +4,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePlanning } from '@/hooks/use-planning'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useAccounts } from '@/hooks/use-accounts'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useAccountsContext } from '@/contexts/data-provider'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Check, Calendar } from 'lucide-react'
@@ -17,8 +17,8 @@ interface UpcomingBillsProps {
 
 export default function UpcomingBills({ onMarkPaid }: UpcomingBillsProps) {
   const { recurringExpenses, loading } = usePlanning()
-  const { addTransaction } = useTransactions()
-  const { accounts } = useAccounts()
+  const { addTransaction } = useTransactionsContext()
+  const { accounts } = useAccountsContext()
   const { toast } = useToast()
 
   const today = new Date()
