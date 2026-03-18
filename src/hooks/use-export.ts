@@ -47,7 +47,7 @@ export function useExport() {
         if (filters?.endDate) {
           txs = txs.filter((t) => t.date <= filters.endDate!)
         }
-        exportTransactionsToExcel(txs, categories, filters)
+        await exportTransactionsToExcel(txs, categories, filters)
         toast({ title: '✅ Excel exportado com sucesso!' })
       } catch (err) {
         console.error(err)

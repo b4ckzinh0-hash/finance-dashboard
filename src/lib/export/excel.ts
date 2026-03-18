@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -14,11 +14,11 @@ interface ExportFilters {
   label?: string
 }
 
-export function exportTransactionsToExcel(
+export async function exportTransactionsToExcel(
   transactions: Transaction[],
   categories: Category[],
   filters?: ExportFilters
-): void {
+): Promise<void> {
   const now = new Date()
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]))
 
@@ -30,48 +30,71 @@ export function exportTransactionsToExcel(
     .reduce((s, t) => s + t.amount, 0)
   const balance = income - expenses
 
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'Finance Dashboard'
+  workbook.created = now
+
   // ─── Sheet 1: Resumo ───────────────────────────────────────────────────────
-  const summaryData = [
-    ['Finance Dashboard — Relatório Financeiro'],
-    ['Período:', filters?.label ?? format(now, 'MMMM yyyy', { locale: ptBR })],
-    ['Gerado em:', format(now, "dd/MM/yyyy 'às' HH:mm")],
-    [],
-    ['Métrica', 'Valor (R$)'],
-    ['Receitas', income],
-    ['Despesas', expenses],
-    ['Saldo', balance],
-    ['Total de transações', transactions.length],
+  const summarySheet = workbook.addWorksheet('Resumo')
+  summarySheet.columns = [
+    { header: '', key: 'label', width: 32 },
+    { header: '', key: 'value', width: 22 },
   ]
 
-  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
-
-  // Style column widths
-  summarySheet['!cols'] = [{ wch: 30 }, { wch: 20 }]
+  summarySheet.addRow(['Finance Dashboard — Relatório Financeiro'])
+  summarySheet.addRow(['Período:', filters?.label ?? format(now, 'MMMM yyyy', { locale: ptBR })])
+  summarySheet.addRow(['Gerado em:', format(now, "dd/MM/yyyy 'às' HH:mm")])
+  summarySheet.addRow([])
+  const summaryHeaderRow = summarySheet.addRow(['Métrica', 'Valor (R$)'])
+  summaryHeaderRow.font = { bold: true }
+  summaryHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6D28D9' } }
+  summaryHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+  summarySheet.addRow(['Receitas', brl(income)])
+  summarySheet.addRow(['Despesas', brl(expenses)])
+  summarySheet.addRow(['Saldo', brl(balance)])
+  summarySheet.addRow(['Total de transações', transactions.length])
 
   // ─── Sheet 2: Transações ───────────────────────────────────────────────────
-  const txHeaders = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Método de Pagamento', 'Valor (R$)', 'Observações']
-  const txRows = transactions.map((t) => [
-    format(new Date(t.date), 'dd/MM/yyyy'),
-    t.description,
-    categoryMap.get(t.category_id ?? '') ?? '—',
-    t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
-    t.payment_method ?? '—',
-    t.amount,
-    t.notes ?? '',
-  ])
-
-  const txSheet = XLSX.utils.aoa_to_sheet([txHeaders, ...txRows])
-  txSheet['!cols'] = [
-    { wch: 12 },
-    { wch: 30 },
-    { wch: 20 },
-    { wch: 14 },
-    { wch: 22 },
-    { wch: 14 },
-    { wch: 30 },
+  const txSheet = workbook.addWorksheet('Transações')
+  txSheet.columns = [
+    { header: 'Data', key: 'date', width: 14 },
+    { header: 'Descrição', key: 'desc', width: 32 },
+    { header: 'Categoria', key: 'cat', width: 22 },
+    { header: 'Tipo', key: 'type', width: 16 },
+    { header: 'Método de Pagamento', key: 'method', width: 24 },
+    { header: 'Valor (R$)', key: 'amount', width: 16 },
+    { header: 'Observações', key: 'notes', width: 32 },
   ]
 
+  const txHeaderRow = txSheet.getRow(1)
+  txHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+  txHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F3F46' } }
+
+  transactions.forEach((t) => {
+    txSheet.addRow({
+      date: format(new Date(t.date), 'dd/MM/yyyy'),
+      desc: t.description,
+      cat: categoryMap.get(t.category_id ?? '') ?? '—',
+      type: t.type === 'income' ? 'Receita' : t.type === 'expense' ? 'Despesa' : 'Transferência',
+      method: t.payment_method ?? '—',
+      amount: brl(t.amount),
+      notes: t.notes ?? '',
+    })
+  })
+
   // ─── Sheet 3: Categorias ───────────────────────────────────────────────────
+  const catSheet = workbook.addWorksheet('Categorias')
+  catSheet.columns = [
+    { header: 'Categoria', key: 'name', width: 24 },
+    { header: 'Total Gasto (R$)', key: 'amount', width: 20 },
+    { header: 'Nº Transações', key: 'count', width: 18 },
+    { header: '% das Despesas', key: 'pct', width: 18 },
+  ]
+
+  const catHeaderRow = catSheet.getRow(1)
+  catHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+  catHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F3F46' } }
+
   const catTotals = new Map<string, { name: string; amount: number; count: number }>()
   transactions
     .filter((t) => t.type === 'expense' && t.category_id)
@@ -85,27 +108,20 @@ export function exportTransactionsToExcel(
       entry.count++
     })
 
-  const catHeaders = ['Categoria', 'Total Gasto (R$)', 'Nº Transações', '% das Despesas']
-  const catRows = Array.from(catTotals.values())
+  Array.from(catTotals.values())
     .sort((a, b) => b.amount - a.amount)
-    .map((c) => [
-      c.name,
-      c.amount,
-      c.count,
-      expenses > 0 ? `${((c.amount / expenses) * 100).toFixed(1)}%` : '0%',
-    ])
+    .forEach((c) => {
+      catSheet.addRow({
+        name: c.name,
+        amount: brl(c.amount),
+        count: c.count,
+        pct: expenses > 0 ? `${((c.amount / expenses) * 100).toFixed(1)}%` : '0%',
+      })
+    })
 
-  const catSheet = XLSX.utils.aoa_to_sheet([catHeaders, ...catRows])
-  catSheet['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 16 }, { wch: 16 }]
-
-  // ─── Workbook ──────────────────────────────────────────────────────────────
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, summarySheet, 'Resumo')
-  XLSX.utils.book_append_sheet(wb, txSheet, 'Transações')
-  XLSX.utils.book_append_sheet(wb, catSheet, 'Categorias')
-
-  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-  const blob = new Blob([excelBuffer], {
+  // ─── Write & download ──────────────────────────────────────────────────────
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
 
