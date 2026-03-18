@@ -5,13 +5,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useCategories } from '@/hooks/use-categories'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { formatCurrency } from '@/lib/utils'
 
 export default function SpendingPatterns() {
-  const { transactions, loading: txLoading } = useTransactions()
-  const { categories, loading: catLoading } = useCategories()
+  const { transactions, loading: txLoading } = useTransactionsContext()
+  const { categories, loading: catLoading } = useCategoriesContext()
 
   const loading = txLoading || catLoading
 

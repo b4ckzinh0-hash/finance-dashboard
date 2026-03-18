@@ -6,8 +6,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useCategories } from '@/hooks/use-categories'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { formatCurrency, getMonthName } from '@/lib/utils'
 import { ExportButtons } from '@/components/reports/export-buttons'
 import {
@@ -15,8 +15,8 @@ import {
 } from 'recharts'
 
 export default function ReportsPage() {
-  const { transactions } = useTransactions()
-  const { categories } = useCategories()
+  const { transactions } = useTransactionsContext()
+  const { categories } = useCategoriesContext()
 
   const now = new Date()
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth())

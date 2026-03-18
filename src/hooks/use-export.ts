@@ -3,14 +3,14 @@
 import { useCallback, useState } from 'react'
 import { exportTransactionsToPDF } from '@/lib/export/pdf'
 import { exportTransactionsToExcel } from '@/lib/export/excel'
-import { useTransactions } from './use-transactions'
-import { useCategories } from './use-categories'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { useToast } from '@/components/ui/use-toast'
 
 export function useExport() {
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null)
-  const { transactions } = useTransactions()
-  const { categories } = useCategories()
+  const { transactions } = useTransactionsContext()
+  const { categories } = useCategoriesContext()
   const { toast } = useToast()
 
   const exportToPDF = useCallback(

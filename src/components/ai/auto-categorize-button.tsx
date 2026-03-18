@@ -3,15 +3,15 @@
 import { useState } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useCategories } from '@/hooks/use-categories'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { useAiCategorize } from '@/hooks/use-ai-categorize'
 import { useToast } from '@/components/ui/use-toast'
 
 export function AutoCategorizeButton() {
   const [loading, setLoading] = useState(false)
-  const { transactions, updateTransaction } = useTransactions()
-  const { categories } = useCategories()
+  const { transactions, updateTransaction } = useTransactionsContext()
+  const { categories } = useCategoriesContext()
   const { suggest } = useAiCategorize()
   const { toast } = useToast()
 

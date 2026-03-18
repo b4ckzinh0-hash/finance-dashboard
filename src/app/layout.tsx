@@ -4,7 +4,6 @@ import { AuthProvider } from '@/contexts/auth-context'
 import { NotificationProvider } from '@/contexts/notification-context'
 import { Toaster } from '@/components/ui/toaster'
 
-export const dynamic = 'force-dynamic'
 
 export const viewport: Viewport = {
   themeColor: '#8b5cf6',
