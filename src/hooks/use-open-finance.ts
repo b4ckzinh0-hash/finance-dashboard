@@ -316,14 +316,11 @@ export function useOpenFinance() {
       if (banks === null && activeProvider === 'belvo' && providers.pluggy) {
         try {
           banks = await loadPluggyItems()
-          usedProvider = 'pluggy'
           setActiveProvider('pluggy')
         } catch (pluggyErr) {
           console.warn('[useOpenFinance] Pluggy fallback also failed:', pluggyErr)
         }
       }
-
-      void usedProvider
 
       if (banks === null) {
         if (!providers.pluggy && !providers.belvo) {
