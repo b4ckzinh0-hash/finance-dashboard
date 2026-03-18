@@ -4,8 +4,8 @@ import { useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useCategories } from '@/hooks/use-categories'
+import { useTransactionsContext } from '@/contexts/transactions-context'
+import { useCategoriesContext } from '@/contexts/categories-context'
 import { formatCurrency } from '@/lib/utils'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 
@@ -28,8 +28,8 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { name
 }
 
 export function ExpensePieChart() {
-  const { transactions, loading: txLoading } = useTransactions()
-  const { categories, loading: catLoading } = useCategories()
+  const { transactions, loading: txLoading } = useTransactionsContext()
+  const { categories, loading: catLoading } = useCategoriesContext()
   const loading = txLoading || catLoading
 
   const data = useMemo(() => {

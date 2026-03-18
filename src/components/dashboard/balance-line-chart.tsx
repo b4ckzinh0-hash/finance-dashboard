@@ -12,8 +12,8 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useAccounts } from '@/hooks/use-accounts'
+import { useTransactionsContext } from '@/contexts/transactions-context'
+import { useAccountsContext } from '@/contexts/accounts-context'
 import { formatCurrency, getMonthName } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 
@@ -38,8 +38,8 @@ function CustomTooltip({
 }
 
 export function BalanceLineChart() {
-  const { transactions, loading: txLoading } = useTransactions()
-  const { totalBalance, loading: accLoading } = useAccounts()
+  const { transactions, loading: txLoading } = useTransactionsContext()
+  const { totalBalance, loading: accLoading } = useAccountsContext()
   const loading = txLoading || accLoading
 
   const data = useMemo(() => {

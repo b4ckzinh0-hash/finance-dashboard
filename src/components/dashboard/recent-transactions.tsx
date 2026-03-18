@@ -2,15 +2,15 @@
 
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { useTransactions } from '@/hooks/use-transactions'
-import { useCategories } from '@/hooks/use-categories'
+import { useTransactionsContext } from '@/contexts/transactions-context'
+import { useCategoriesContext } from '@/contexts/categories-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 export function RecentTransactions() {
-  const { transactions, loading: txLoading } = useTransactions()
-  const { categories, loading: catLoading } = useCategories()
+  const { transactions, loading: txLoading } = useTransactionsContext()
+  const { categories, loading: catLoading } = useCategoriesContext()
   const loading = txLoading || catLoading
 
   const recent = useMemo(() => transactions.slice(0, 5), [transactions])

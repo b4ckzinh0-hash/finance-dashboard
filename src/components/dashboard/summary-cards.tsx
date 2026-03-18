@@ -5,8 +5,8 @@ import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, PiggyBank } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAccounts } from '@/hooks/use-accounts'
-import { useTransactions } from '@/hooks/use-transactions'
+import { useAccountsContext } from '@/contexts/accounts-context'
+import { useTransactionsContext } from '@/contexts/transactions-context'
 import { formatCurrency } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 
@@ -40,8 +40,8 @@ function pctChange(curr: number, prev: number): number {
 }
 
 export function SummaryCards() {
-  const { totalBalance, loading: accountsLoading } = useAccounts()
-  const { transactions, loading: txLoading } = useTransactions()
+  const { totalBalance, loading: accountsLoading } = useAccountsContext()
+  const { transactions, loading: txLoading } = useTransactionsContext()
   const loading = accountsLoading || txLoading
 
   const metrics = useMemo(() => {

@@ -1,12 +1,42 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Account } from '@/types'
 import { getOfflineAccounts } from '@/lib/offline/operations'
 import { cacheServerData } from '@/lib/offline/sync'
 
-export function useAccounts() {
+interface AccountsContextValue {
+  accounts: Account[]
+  loading: boolean
+  isOffline: boolean
+  totalBalance: number
+  addAccount: (
+    payload: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => Promise<{ error: unknown }>
+  updateAccount: (id: string, payload: Partial<Account>) => Promise<{ error: unknown }>
+  deleteAccount: (id: string) => Promise<{ error: unknown }>
+  transferBetweenAccounts: (
+    fromAccountId: string,
+    toAccountId: string,
+    amount: number,
+    description: string,
+    date: string
+  ) => Promise<{ error: unknown }>
+  refresh: () => Promise<void>
+}
+
+const AccountsContext = createContext<AccountsContextValue | undefined>(undefined)
+
+export function AccountsProvider({ children }: { children: ReactNode }) {
   const supabase = useRef(createClient()).current
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,12 +128,12 @@ export function useAccounts() {
       // Delegate to a DB function so both balance updates and transaction
       // records are committed atomically inside a single transaction.
       const { error } = await supabase.rpc('transfer_between_accounts', {
-        p_user_id:        user.id,
-        p_from_account:   fromAccountId,
-        p_to_account:     toAccountId,
-        p_amount:         amount,
-        p_description:    description,
-        p_date:           date,
+        p_user_id: user.id,
+        p_from_account: fromAccountId,
+        p_to_account: toAccountId,
+        p_amount: amount,
+        p_description: description,
+        p_date: date,
       })
 
       if (!error) await fetchAccounts()
@@ -115,15 +145,27 @@ export function useAccounts() {
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
 
-  return {
-    accounts,
-    loading,
-    isOffline,
-    totalBalance,
-    addAccount,
-    updateAccount,
-    deleteAccount,
-    transferBetweenAccounts,
-    refresh: fetchAccounts,
-  }
+  return (
+    <AccountsContext.Provider
+      value={{
+        accounts,
+        loading,
+        isOffline,
+        totalBalance,
+        addAccount,
+        updateAccount,
+        deleteAccount,
+        transferBetweenAccounts,
+        refresh: fetchAccounts,
+      }}
+    >
+      {children}
+    </AccountsContext.Provider>
+  )
+}
+
+export function useAccountsContext(): AccountsContextValue {
+  const ctx = useContext(AccountsContext)
+  if (!ctx) throw new Error('useAccountsContext must be used inside <AccountsProvider>')
+  return ctx
 }
