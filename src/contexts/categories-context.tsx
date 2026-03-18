@@ -1,12 +1,36 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Category } from '@/types'
 import { getOfflineCategories } from '@/lib/offline/operations'
 import { cacheServerData } from '@/lib/offline/sync'
 
-export function useCategories() {
+interface CategoriesContextValue {
+  categories: Category[]
+  expenseCategories: Category[]
+  incomeCategories: Category[]
+  loading: boolean
+  isOffline: boolean
+  addCategory: (
+    payload: Omit<Category, 'id' | 'user_id' | 'created_at' | 'is_default'>
+  ) => Promise<{ error: unknown }>
+  updateCategory: (id: string, payload: Partial<Category>) => Promise<{ error: unknown }>
+  deleteCategory: (id: string) => Promise<{ error: unknown }>
+  refresh: () => Promise<void>
+}
+
+const CategoriesContext = createContext<CategoriesContextValue | undefined>(undefined)
+
+export function CategoriesProvider({ children }: { children: ReactNode }) {
   const supabase = useRef(createClient()).current
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,17 +99,29 @@ export function useCategories() {
   )
 
   const expenseCategories = categories.filter((c) => c.type === 'expense')
-  const incomeCategories  = categories.filter((c) => c.type === 'income')
+  const incomeCategories = categories.filter((c) => c.type === 'income')
 
-  return {
-    categories,
-    expenseCategories,
-    incomeCategories,
-    loading,
-    isOffline,
-    addCategory,
-    updateCategory,
-    deleteCategory,
-    refresh: fetchCategories,
-  }
+  return (
+    <CategoriesContext.Provider
+      value={{
+        categories,
+        expenseCategories,
+        incomeCategories,
+        loading,
+        isOffline,
+        addCategory,
+        updateCategory,
+        deleteCategory,
+        refresh: fetchCategories,
+      }}
+    >
+      {children}
+    </CategoriesContext.Provider>
+  )
+}
+
+export function useCategoriesContext(): CategoriesContextValue {
+  const ctx = useContext(CategoriesContext)
+  if (!ctx) throw new Error('useCategoriesContext must be used inside <CategoriesProvider>')
+  return ctx
 }

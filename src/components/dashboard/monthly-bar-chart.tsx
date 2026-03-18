@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactions } from '@/hooks/use-transactions'
+import { useTransactionsContext } from '@/contexts/transactions-context'
 import { formatCurrency, getMonthName } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 
@@ -42,7 +42,7 @@ function CustomTooltip({
 }
 
 export function MonthlyBarChart() {
-  const { transactions, loading } = useTransactions()
+  const { transactions, loading } = useTransactionsContext()
 
   const data = useMemo(() => {
     const now = new Date()

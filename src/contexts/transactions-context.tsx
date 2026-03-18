@@ -1,6 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, TransactionFilters } from '@/types'
 import {
@@ -11,7 +19,25 @@ import {
 } from '@/lib/offline/operations'
 import { cacheServerData } from '@/lib/offline/sync'
 
-export function useTransactions() {
+interface TransactionsContextValue {
+  transactions: Transaction[]
+  loading: boolean
+  isOffline: boolean
+  addTransaction: (
+    payload: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => Promise<{ error: Error | null }>
+  updateTransaction: (
+    id: string,
+    payload: Partial<Transaction>
+  ) => Promise<{ error: unknown }>
+  deleteTransaction: (id: string) => Promise<{ error: unknown }>
+  filterTransactions: (filters: TransactionFilters) => Transaction[]
+  refresh: () => Promise<void>
+}
+
+const TransactionsContext = createContext<TransactionsContextValue | undefined>(undefined)
+
+export function TransactionsProvider({ children }: { children: ReactNode }) {
   const supabase = useRef(createClient()).current
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,7 +56,6 @@ export function useTransactions() {
         // Cache to IndexedDB in the background
         cacheServerData().catch(() => {})
       } else {
-        // Network request failed — fall back to local cache
         const local = await getOfflineTransactions()
         setTransactions(local as Transaction[])
         setIsOffline(true)
@@ -76,7 +101,7 @@ export function useTransactions() {
       if (!error) {
         await fetchTransactions()
       }
-      return { error }
+      return { error: error as Error | null }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [fetchTransactions]
@@ -135,14 +160,26 @@ export function useTransactions() {
     [transactions]
   )
 
-  return {
-    transactions,
-    loading,
-    isOffline,
-    addTransaction,
-    updateTransaction,
-    deleteTransaction,
-    filterTransactions,
-    refresh: fetchTransactions,
-  }
+  return (
+    <TransactionsContext.Provider
+      value={{
+        transactions,
+        loading,
+        isOffline,
+        addTransaction,
+        updateTransaction,
+        deleteTransaction,
+        filterTransactions,
+        refresh: fetchTransactions,
+      }}
+    >
+      {children}
+    </TransactionsContext.Provider>
+  )
+}
+
+export function useTransactionsContext(): TransactionsContextValue {
+  const ctx = useContext(TransactionsContext)
+  if (!ctx) throw new Error('useTransactionsContext must be used inside <TransactionsProvider>')
+  return ctx
 }
