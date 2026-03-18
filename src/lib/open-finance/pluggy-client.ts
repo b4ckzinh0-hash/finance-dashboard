@@ -20,23 +20,47 @@ import type {
   PluggyTransactionsResponse,
 } from './pluggy-types'
 
+/** Timeout in milliseconds for all Pluggy API requests. */
+const PLUGGY_FETCH_TIMEOUT_MS = 15_000
+
+/**
+ * Wrapper around fetch() that adds a 15-second AbortController timeout.
+ * Throws a descriptive error when the request times out.
+ */
+async function pluggyFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), PLUGGY_FETCH_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' })
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Pluggy API timeout after ${PLUGGY_FETCH_TIMEOUT_MS / 1000}s: ${url}`)
+    }
+    throw err
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 /**
  * Authenticates with Pluggy using client credentials.
  * Returns an API key (access token) valid for a short period.
+ * Throws a structured error with `status` property for HTTP failures.
  */
 export async function authenticate(): Promise<string> {
   const { clientId, clientSecret } = getPluggyCredentials()
 
-  const res = await fetch(`${PLUGGY_BASE_URL}/auth`, {
+  const res = await pluggyFetch(`${PLUGGY_BASE_URL}/auth`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clientId, clientSecret }),
-    cache: 'no-store',
   })
 
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Pluggy auth failed (${res.status}): ${body}`)
+    const err = new Error(`Pluggy auth failed (${res.status}): ${body}`) as Error & { status: number }
+    err.status = res.status
+    throw err
   }
 
   const data = (await res.json()) as PluggyAuthResponse
@@ -51,17 +75,16 @@ export async function createConnectToken(
   apiKey: string,
   itemId?: string
 ): Promise<string> {
-  const body: Record<string, unknown> = {}
-  if (itemId) body.itemId = itemId
+  const payload: Record<string, unknown> = {}
+  if (itemId) payload.itemId = itemId
 
-  const res = await fetch(`${PLUGGY_BASE_URL}/connect_token`, {
+  const res = await pluggyFetch(`${PLUGGY_BASE_URL}/connect_token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-API-KEY': apiKey,
     },
-    body: JSON.stringify(body),
-    cache: 'no-store',
+    body: JSON.stringify(payload),
   })
 
   if (!res.ok) {
@@ -77,9 +100,8 @@ export async function createConnectToken(
  * Lists all connected bank items.
  */
 export async function getItems(apiKey: string): Promise<PluggyItem[]> {
-  const res = await fetch(`${PLUGGY_BASE_URL}/items`, {
+  const res = await pluggyFetch(`${PLUGGY_BASE_URL}/items`, {
     headers: { 'X-API-KEY': apiKey },
-    cache: 'no-store',
   })
 
   if (!res.ok) {
@@ -95,9 +117,8 @@ export async function getItems(apiKey: string): Promise<PluggyItem[]> {
  * Gets a specific connected bank item by ID.
  */
 export async function getItem(apiKey: string, itemId: string): Promise<PluggyItem> {
-  const res = await fetch(`${PLUGGY_BASE_URL}/items/${itemId}`, {
+  const res = await pluggyFetch(`${PLUGGY_BASE_URL}/items/${itemId}`, {
     headers: { 'X-API-KEY': apiKey },
-    cache: 'no-store',
   })
 
   if (!res.ok) {
@@ -112,10 +133,9 @@ export async function getItem(apiKey: string, itemId: string): Promise<PluggyIte
  * Deletes (disconnects) a bank item.
  */
 export async function deleteItem(apiKey: string, itemId: string): Promise<void> {
-  const res = await fetch(`${PLUGGY_BASE_URL}/items/${itemId}`, {
+  const res = await pluggyFetch(`${PLUGGY_BASE_URL}/items/${itemId}`, {
     method: 'DELETE',
     headers: { 'X-API-KEY': apiKey },
-    cache: 'no-store',
   })
 
   if (!res.ok) {
@@ -134,9 +154,8 @@ export async function getAccounts(
   const url = new URL(`${PLUGGY_BASE_URL}/accounts`)
   url.searchParams.set('itemId', itemId)
 
-  const res = await fetch(url.toString(), {
+  const res = await pluggyFetch(url.toString(), {
     headers: { 'X-API-KEY': apiKey },
-    cache: 'no-store',
   })
 
   if (!res.ok) {
@@ -167,9 +186,8 @@ export async function getTransactions(
   if (to) url.searchParams.set('to', to)
   url.searchParams.set('pageSize', '100')
 
-  const res = await fetch(url.toString(), {
+  const res = await pluggyFetch(url.toString(), {
     headers: { 'X-API-KEY': apiKey },
-    cache: 'no-store',
   })
 
   if (!res.ok) {
@@ -188,9 +206,8 @@ export async function getIdentity(
   apiKey: string,
   itemId: string
 ): Promise<unknown> {
-  const res = await fetch(`${PLUGGY_BASE_URL}/identity?itemId=${itemId}`, {
+  const res = await pluggyFetch(`${PLUGGY_BASE_URL}/identity?itemId=${itemId}`, {
     headers: { 'X-API-KEY': apiKey },
-    cache: 'no-store',
   })
 
   if (!res.ok) {

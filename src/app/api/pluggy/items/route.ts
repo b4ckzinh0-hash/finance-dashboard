@@ -21,9 +21,20 @@ export async function GET() {
     return NextResponse.json(items)
   } catch (err) {
     console.error('[pluggy/items GET]', err)
+    const status = classifyPluggyError(err)
     return NextResponse.json(
       { error: 'Falha ao listar bancos conectados' },
-      { status: 500 }
+      { status }
     )
   }
+}
+
+/** Maps a Pluggy client error to an appropriate HTTP status code. */
+function classifyPluggyError(err: unknown): number {
+  if (err instanceof Error) {
+    if (err.message.includes('timeout')) return 504
+    const httpStatus = (err as Error & { status?: number }).status
+    if (httpStatus === 401 || httpStatus === 403) return 401
+  }
+  return 500
 }
