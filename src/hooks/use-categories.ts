@@ -3,16 +3,33 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Category } from '@/types'
+import { getOfflineCategories } from '@/lib/offline/operations'
+import { cacheServerData } from '@/lib/offline/sync'
 
 export function useCategories() {
   const supabase = createClient()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [isOffline, setIsOffline] = useState(false)
 
   const fetchCategories = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('categories').select('*').order('name')
-    setCategories((data as Category[]) ?? [])
+    if (navigator.onLine) {
+      const { data, error } = await supabase.from('categories').select('*').order('name')
+      if (!error && data) {
+        setCategories((data as Category[]) ?? [])
+        setIsOffline(false)
+        cacheServerData().catch(() => {})
+      } else {
+        const local = await getOfflineCategories()
+        setCategories(local as Category[])
+        setIsOffline(true)
+      }
+    } else {
+      const local = await getOfflineCategories()
+      setCategories(local as Category[])
+      setIsOffline(true)
+    }
     setLoading(false)
   }, [supabase])
 
@@ -60,6 +77,7 @@ export function useCategories() {
     expenseCategories,
     incomeCategories,
     loading,
+    isOffline,
     addCategory,
     updateCategory,
     deleteCategory,
