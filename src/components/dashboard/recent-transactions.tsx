@@ -1,14 +1,14 @@
 "use client"
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
-import { useTransactionsContext } from '@/contexts/transactions-context'
-import { useCategoriesContext } from '@/contexts/categories-context'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
-export function RecentTransactions() {
+export const RecentTransactions = memo(function RecentTransactions() {
   const { transactions, loading: txLoading } = useTransactionsContext()
   const { categories, loading: catLoading } = useCategoriesContext()
   const loading = txLoading || catLoading
@@ -88,4 +88,4 @@ export function RecentTransactions() {
       </CardContent>
     </Card>
   )
-}
+})

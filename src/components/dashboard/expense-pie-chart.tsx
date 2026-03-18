@@ -1,11 +1,11 @@
 "use client"
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTransactionsContext } from '@/contexts/transactions-context'
-import { useCategoriesContext } from '@/contexts/categories-context'
+import { useTransactionsContext } from '@/contexts/data-provider'
+import { useCategoriesContext } from '@/contexts/data-provider'
 import { formatCurrency } from '@/lib/utils'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 
@@ -27,7 +27,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { name
   return null
 }
 
-export function ExpensePieChart() {
+export const ExpensePieChart = memo(function ExpensePieChart() {
   const { transactions, loading: txLoading } = useTransactionsContext()
   const { categories, loading: catLoading } = useCategoriesContext()
   const loading = txLoading || catLoading
@@ -111,4 +111,4 @@ export function ExpensePieChart() {
       </CardContent>
     </Card>
   )
-}
+})
