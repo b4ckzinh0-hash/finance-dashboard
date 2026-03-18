@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertTriangle, Info, DollarSign, Calendar } from 'lucide-react'
+import { AlertTriangle, DollarSign, Calendar } from 'lucide-react'
 import { useTransactions } from '@/hooks/use-transactions'
 import { useAccounts } from '@/hooks/use-accounts'
 import { usePlanning } from '@/hooks/use-planning'
