@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -28,24 +29,44 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const supabase = createClient()
-  const [user, setUser]       = useState<User | null>(null)
+  const supabase = useRef(createClient()).current
+  const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(
     async (userId: string) => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-      setProfile(data ?? null)
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+        setProfile(data ?? null)
+      } catch {
+        setProfile(null)
+      }
     },
-    [supabase]
+    // supabase is a stable ref — will never change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
+  // Eagerly fetch the current session + subscribe to future auth changes
   useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          fetchProfile(session.user.id)
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        setLoading(false)
+      })
+
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUser(session?.user ?? null)
@@ -58,14 +79,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     )
     return () => listener.subscription.unsubscribe()
-  }, [supabase, fetchProfile])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Safety-net: if loading hasn't resolved after 5 s, force it off
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) console.warn('[AuthProvider] Loading timeout — forcing loading=false')
+        return false
+      })
+    }, 5000)
+    return () => clearTimeout(timeout)
+  }, [])
 
   const signIn = useCallback(
     async (email: string, password: string) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       return { error: error as Error | null }
     },
-    [supabase]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   const signUp = useCallback(
@@ -77,12 +111,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       return { error: error as Error | null }
     },
-    [supabase]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
-  }, [supabase])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut }}>
