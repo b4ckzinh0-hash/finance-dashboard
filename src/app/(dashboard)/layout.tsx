@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/auth-context'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { MobileNav } from '@/components/layout/mobile-nav'
+import { OfflineProvider } from '@/contexts/offline-context'
+import { OfflineIndicator } from '@/components/offline-indicator'
 
 export default function DashboardLayout({
   children,
@@ -32,15 +34,18 @@ export default function DashboardLayout({
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col md:ml-64">
-        <Header />
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
-          {children}
-        </main>
+    <OfflineProvider>
+      <OfflineIndicator />
+      <div className="min-h-screen bg-background flex">
+        <Sidebar />
+        <div className="flex-1 flex flex-col md:ml-64">
+          <Header />
+          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+            {children}
+          </main>
+        </div>
+        <MobileNav />
       </div>
-      <MobileNav />
-    </div>
+    </OfflineProvider>
   )
 }

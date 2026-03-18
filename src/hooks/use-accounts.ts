@@ -3,20 +3,37 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Account } from '@/types'
+import { getOfflineAccounts } from '@/lib/offline/operations'
+import { cacheServerData } from '@/lib/offline/sync'
 
 export function useAccounts() {
   const supabase = createClient()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
+  const [isOffline, setIsOffline] = useState(false)
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('is_active', true)
-      .order('name')
-    setAccounts((data as Account[]) ?? [])
+    if (navigator.onLine) {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+      if (!error && data) {
+        setAccounts((data as Account[]) ?? [])
+        setIsOffline(false)
+        cacheServerData().catch(() => {})
+      } else {
+        const local = await getOfflineAccounts()
+        setAccounts(local as Account[])
+        setIsOffline(true)
+      }
+    } else {
+      const local = await getOfflineAccounts()
+      setAccounts(local as Account[])
+      setIsOffline(true)
+    }
     setLoading(false)
   }, [supabase])
 
@@ -95,6 +112,7 @@ export function useAccounts() {
   return {
     accounts,
     loading,
+    isOffline,
     totalBalance,
     addAccount,
     updateAccount,
