@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { PluggyItem, PluggyAccount, PluggyTransaction } from '@/lib/open-finance/pluggy-types'
 import { useToast } from '@/components/ui/use-toast'
 
@@ -15,22 +15,53 @@ export interface ConnectedBank {
   accounts: PluggyAccount[]
 }
 
+/** Timeout (ms) for fetch calls to /api/pluggy/* routes. */
+const FETCH_TIMEOUT_MS = 10_000
+/** Timeout (ms) to auto-reset the connecting spinner if the widget never opens. */
+const WIDGET_OPEN_TIMEOUT_MS = 10_000
+/** Safety timeout (ms) — force-reset connecting if still true after this long. */
+const CONNECTING_SAFETY_TIMEOUT_MS = 30_000
+
 export function useOpenFinance() {
   const [connectedBanks, setConnectedBanks] = useState<ConnectedBank[]>([])
   const [transactions, setTransactions] = useState<PluggyTransaction[]>([])
   const [connectToken, setConnectToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState<string | null>(null)
   const [pluggyConfigured, setPluggyConfigured] = useState(true)
   const { toast } = useToast()
 
+  // Keep a stable ref to toast so callbacks don't need it as a dependency.
+  const toastRef = useRef(toast)
+  toastRef.current = toast
+
+  // ── Safety timeout: auto-reset connecting after CONNECTING_SAFETY_TIMEOUT_MS ─
+
+  useEffect(() => {
+    if (!connecting) return
+    const id = setTimeout(() => {
+      setConnecting(false)
+      setConnectToken(null)
+      toastRef.current({
+        title: 'Tempo esgotado ao conectar banco',
+        description: 'Tente novamente.',
+        variant: 'destructive',
+      })
+    }, CONNECTING_SAFETY_TIMEOUT_MS)
+    return () => clearTimeout(id)
+  }, [connecting])
+
   // ── Load connected items from Pluggy ────────────────────────────────────────
 
   const loadItems = useCallback(async () => {
     setLoading(true)
+    setLoadError(false)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
     try {
-      const res = await fetch('/api/pluggy/items')
+      const res = await fetch('/api/pluggy/items', { signal: controller.signal })
 
       if (res.status === 503) {
         setPluggyConfigured(false)
@@ -62,11 +93,13 @@ export function useOpenFinance() {
       setConnectedBanks(banksWithAccounts)
     } catch (err) {
       console.error('[useOpenFinance] loadItems:', err)
-      toast({ title: 'Erro ao carregar bancos conectados', variant: 'destructive' })
+      setLoadError(true)
+      toastRef.current({ title: 'Erro ao carregar bancos conectados', variant: 'destructive' })
     } finally {
+      clearTimeout(timeout)
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     loadItems()
@@ -74,28 +107,49 @@ export function useOpenFinance() {
 
   // ── Open the Pluggy Connect widget ──────────────────────────────────────────
 
-  const openConnectWidget = useCallback(
-    async (itemId?: string) => {
-      setConnecting(true)
-      try {
-        const res = await fetch('/api/pluggy/connect-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(itemId ? { itemId } : {}),
+  const openConnectWidget = useCallback(async (itemId?: string) => {
+    setConnecting(true)
+    const controller = new AbortController()
+    const fetchTimeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    try {
+      const res = await fetch('/api/pluggy/connect-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(itemId ? { itemId } : {}),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) throw new Error('Falha ao obter token de conexão')
+
+      const { accessToken } = await res.json()
+
+      // Set a timeout: if the widget doesn't open/close within WIDGET_OPEN_TIMEOUT_MS,
+      // reset the spinner so the user isn't stuck.
+      setTimeout(() => {
+        setConnectToken((prev) => {
+          if (prev === accessToken) {
+            // Token still set but widget hasn't fired any callback — give up.
+            setConnecting(false)
+            toastRef.current({
+              title: 'Não foi possível abrir o widget de conexão',
+              description: 'Verifique sua conexão e tente novamente.',
+              variant: 'destructive',
+            })
+            return null
+          }
+          return prev
         })
+      }, WIDGET_OPEN_TIMEOUT_MS)
 
-        if (!res.ok) throw new Error('Falha ao obter token de conexão')
-
-        const { accessToken } = await res.json()
-        setConnectToken(accessToken)
-      } catch (err) {
-        console.error('[useOpenFinance] openConnectWidget:', err)
-        toast({ title: 'Erro ao abrir widget de conexão', variant: 'destructive' })
-        setConnecting(false)
-      }
-    },
-    [toast]
-  )
+      setConnectToken(accessToken)
+    } catch (err) {
+      console.error('[useOpenFinance] openConnectWidget:', err)
+      toastRef.current({ title: 'Erro ao abrir widget de conexão', variant: 'destructive' })
+      setConnecting(false)
+    } finally {
+      clearTimeout(fetchTimeout)
+    }
+  }, [])
 
   const closeConnectWidget = useCallback(() => {
     setConnectToken(null)
@@ -108,14 +162,14 @@ export function useOpenFinance() {
     async (itemId: string) => {
       setConnectToken(null)
       setConnecting(false)
-      toast({ title: '🔄 Importando dados bancários...' })
+      toastRef.current({ title: '🔄 Importando dados bancários...' })
       await loadItems()
-      toast({
+      toastRef.current({
         title: '✅ Banco conectado com sucesso!',
         description: `Item ${itemId} importado.`,
       })
     },
-    [loadItems, toast]
+    [loadItems]
   )
 
   const onWidgetError = useCallback(
@@ -123,9 +177,9 @@ export function useOpenFinance() {
       console.error('[useOpenFinance] widget error:', error)
       setConnectToken(null)
       setConnecting(false)
-      toast({ title: 'Erro ao conectar banco', description: error.message, variant: 'destructive' })
+      toastRef.current({ title: 'Erro ao conectar banco', description: error.message, variant: 'destructive' })
     },
-    [toast]
+    []
   )
 
   const onWidgetClose = useCallback(() => {
@@ -142,13 +196,13 @@ export function useOpenFinance() {
         if (!res.ok) throw new Error('Falha ao desconectar banco')
 
         setConnectedBanks((prev) => prev.filter((b) => b.itemId !== itemId))
-        toast({ title: 'Banco desconectado.' })
+        toastRef.current({ title: 'Banco desconectado.' })
       } catch (err) {
         console.error('[useOpenFinance] disconnectBank:', err)
-        toast({ title: 'Erro ao desconectar banco', variant: 'destructive' })
+        toastRef.current({ title: 'Erro ao desconectar banco', variant: 'destructive' })
       }
     },
-    [toast]
+    []
   )
 
   // ── Sync real data from a connected bank ────────────────────────────────────
@@ -184,18 +238,18 @@ export function useOpenFinance() {
           return [...prev.filter((t) => !accountIds.has(t.accountId)), ...allTxs]
         })
 
-        toast({
+        toastRef.current({
           title: `🔄 ${bank?.connectorName ?? 'Banco'} sincronizado!`,
           description: `${allTxs.length} transação(ões) importada(s).`,
         })
       } catch (err) {
         console.error('[useOpenFinance] syncBankData:', err)
-        toast({ title: 'Erro ao sincronizar dados bancários', variant: 'destructive' })
+        toastRef.current({ title: 'Erro ao sincronizar dados bancários', variant: 'destructive' })
       } finally {
         setSyncing(null)
       }
     },
-    [connectedBanks, toast]
+    [connectedBanks]
   )
 
   return {
@@ -203,6 +257,7 @@ export function useOpenFinance() {
     transactions,
     connectToken,
     loading,
+    loadError,
     connecting,
     syncing,
     pluggyConfigured,

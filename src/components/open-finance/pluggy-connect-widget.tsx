@@ -32,6 +32,9 @@ interface PluggyConnectWidgetProps {
 const PLUGGY_CONNECT_SCRIPT_URL =
   'https://cdn.pluggy.ai/pluggy-connect/v2/pluggy-connect.js'
 
+/** Timeout (ms) to wait for the CDN script before giving up. */
+const SCRIPT_LOAD_TIMEOUT_MS = 10_000
+
 /**
  * Loads the Pluggy Connect JS widget from CDN and opens it immediately.
  *
@@ -50,10 +53,17 @@ export function PluggyConnectWidget({
   useEffect(() => {
     let cancelled = false
 
+    function handleScriptFailure(reason: string) {
+      if (cancelled) return
+      console.error('[PluggyConnectWidget]', reason)
+      onError?.({ message: reason })
+      onClose?.()
+    }
+
     function initWidget() {
       if (cancelled) return
       if (!window.PluggyConnect) {
-        console.error('[PluggyConnectWidget] PluggyConnect not available after script load')
+        handleScriptFailure('Widget Pluggy Connect não disponível. Verifique sua conexão e tente novamente.')
         return
       }
 
@@ -73,6 +83,7 @@ export function PluggyConnectWidget({
         instanceRef.current.open()
       } catch (err) {
         console.error('[PluggyConnectWidget] Failed to init widget:', err)
+        handleScriptFailure('Falha ao inicializar widget de conexão. Tente novamente.')
       }
     }
 
@@ -92,11 +103,22 @@ export function PluggyConnectWidget({
     )
 
     if (existingScript) {
-      // Script tag exists but may still be loading
-      existingScript.addEventListener('load', initWidget)
+      // Script tag exists but may still be loading — wait with a timeout
+      const scriptTimeout = setTimeout(() => {
+        handleScriptFailure('Tempo esgotado ao carregar widget de conexão. Verifique sua conexão e tente novamente.')
+      }, SCRIPT_LOAD_TIMEOUT_MS)
+
+      existingScript.addEventListener('load', () => {
+        clearTimeout(scriptTimeout)
+        initWidget()
+      })
+      existingScript.addEventListener('error', () => {
+        clearTimeout(scriptTimeout)
+        handleScriptFailure('Falha ao carregar widget de conexão. Verifique sua conexão e tente novamente.')
+      })
       return () => {
         cancelled = true
-        existingScript.removeEventListener('load', initWidget)
+        clearTimeout(scriptTimeout)
         instanceRef.current?.destroy?.()
       }
     }
@@ -104,17 +126,25 @@ export function PluggyConnectWidget({
     const script = document.createElement('script')
     script.src = PLUGGY_CONNECT_SCRIPT_URL
     script.async = true
+
+    const scriptTimeout = setTimeout(() => {
+      handleScriptFailure('Tempo esgotado ao carregar widget de conexão. Verifique sua conexão e tente novamente.')
+    }, SCRIPT_LOAD_TIMEOUT_MS)
+
     script.onload = () => {
+      clearTimeout(scriptTimeout)
       scriptLoadedRef.current = true
       initWidget()
     }
     script.onerror = () => {
-      console.error('[PluggyConnectWidget] Failed to load script from CDN')
+      clearTimeout(scriptTimeout)
+      handleScriptFailure('Falha ao carregar widget de conexão. Verifique sua conexão e tente novamente.')
     }
     document.head.appendChild(script)
 
     return () => {
       cancelled = true
+      clearTimeout(scriptTimeout)
       instanceRef.current?.destroy?.()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

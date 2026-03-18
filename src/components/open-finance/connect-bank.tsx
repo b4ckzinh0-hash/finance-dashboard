@@ -1,16 +1,21 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Loader2, Building2, AlertCircle, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BankCard } from './bank-card'
 import { PluggyConnectWidget } from './pluggy-connect-widget'
 import { useOpenFinance } from '@/hooks/use-open-finance'
 
+/** Time (ms) after which a "taking longer than expected" hint is shown during initial load. */
+const SLOW_LOAD_HINT_MS = 5_000
+
 export function ConnectBank() {
   const {
     connectedBanks,
     connectToken,
     loading,
+    loadError,
     connecting,
     syncing,
     pluggyConfigured,
@@ -22,6 +27,18 @@ export function ConnectBank() {
     syncBankData,
     loadItems,
   } = useOpenFinance()
+
+  const [slowLoad, setSlowLoad] = useState(false)
+
+  // Show a "taking longer than expected" hint after SLOW_LOAD_HINT_MS ms.
+  useEffect(() => {
+    if (!loading) {
+      setSlowLoad(false)
+      return
+    }
+    const id = setTimeout(() => setSlowLoad(true), SLOW_LOAD_HINT_MS)
+    return () => clearTimeout(id)
+  }, [loading])
 
   // ── Not configured ─────────────────────────────────────────────────────────
   if (!pluggyConfigured) {
@@ -52,8 +69,32 @@ export function ConnectBank() {
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
+      <div className="flex flex-col items-center justify-center gap-3 py-16">
         <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
+        {slowLoad && (
+          <p className="text-sm text-zinc-400">Demorando mais que o esperado...</p>
+        )}
+      </div>
+    )
+  }
+
+  // ── Load error — show retry ─────────────────────────────────────────────────
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-red-800/50 bg-red-950/20 p-8 text-center">
+        <AlertCircle className="h-10 w-10 text-red-400" />
+        <div>
+          <p className="font-semibold text-red-300 text-lg">Erro ao carregar bancos conectados</p>
+          <p className="text-sm text-red-400 mt-1">Não foi possível obter a lista de bancos. Verifique sua conexão.</p>
+        </div>
+        <Button
+          variant="outline"
+          className="border-red-700 text-red-300 gap-2"
+          onClick={loadItems}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Tentar novamente
+        </Button>
       </div>
     )
   }
