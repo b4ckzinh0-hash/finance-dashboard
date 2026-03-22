@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -92,33 +93,60 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // ── Individual refreshers ────────────────────────────────────────────────
 
   const refreshTransactions = useCallback(async () => {
-    setTransactionsLoading(true)
+    // Step 1: Hydrate from IndexedDB immediately (stale-while-revalidate)
+    try {
+      const cached = await getOfflineTransactions()
+      if (cached && cached.length > 0) {
+        setTransactions(cached as Transaction[])
+        setTransactionsLoading(false)
+      }
+    } catch (err) {
+      // IndexedDB unavailable, continue with loading state
+      console.warn('[DataProvider] Failed to load transactions from IndexedDB cache:', err)
+    }
+
+    // Step 2: Fetch fresh data from Supabase in background
     if (navigator.onLine) {
       const { data, error } = await supabase
         .from('transactions')
         .select('*, account:accounts(*), category:categories(*)')
         .order('date', { ascending: false })
+        .limit(500) // Limit to most recent 500 transactions to keep fetch fast
       if (!error && data) {
         setTransactions(data as Transaction[])
         setTransactionsOffline(false)
+        setTransactionsLoading(false)
         cacheTransactions(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineTransactions()
         setTransactions(local as Transaction[])
         setTransactionsOffline(true)
+        setTransactionsLoading(false)
       }
     } else {
       const local = await getOfflineTransactions()
       setTransactions(local as Transaction[])
       setTransactionsOffline(true)
+      setTransactionsLoading(false)
     }
-    setTransactionsLoading(false)
   // supabase is a stable ref — will never change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const refreshAccounts = useCallback(async () => {
-    setAccountsLoading(true)
+    // Step 1: Hydrate from IndexedDB immediately (stale-while-revalidate)
+    try {
+      const cached = await getOfflineAccounts()
+      if (cached && cached.length > 0) {
+        setAccounts(cached as Account[])
+        setAccountsLoading(false)
+      }
+    } catch (err) {
+      // IndexedDB unavailable, continue with loading state
+      console.warn('[DataProvider] Failed to load accounts from IndexedDB cache:', err)
+    }
+
+    // Step 2: Fetch fresh data from Supabase in background
     if (navigator.onLine) {
       const { data, error } = await supabase
         .from('accounts')
@@ -128,41 +156,57 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         setAccounts(data as Account[])
         setAccountsOffline(false)
+        setAccountsLoading(false)
         cacheAccounts(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineAccounts()
         setAccounts(local as Account[])
         setAccountsOffline(true)
+        setAccountsLoading(false)
       }
     } else {
       const local = await getOfflineAccounts()
       setAccounts(local as Account[])
       setAccountsOffline(true)
+      setAccountsLoading(false)
     }
-    setAccountsLoading(false)
   // supabase is a stable ref — will never change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const refreshCategories = useCallback(async () => {
-    setCategoriesLoading(true)
+    // Step 1: Hydrate from IndexedDB immediately (stale-while-revalidate)
+    try {
+      const cached = await getOfflineCategories()
+      if (cached && cached.length > 0) {
+        setCategories(cached as Category[])
+        setCategoriesLoading(false)
+      }
+    } catch (err) {
+      // IndexedDB unavailable, continue with loading state
+      console.warn('[DataProvider] Failed to load categories from IndexedDB cache:', err)
+    }
+
+    // Step 2: Fetch fresh data from Supabase in background
     if (navigator.onLine) {
       const { data, error } = await supabase.from('categories').select('*').order('name')
       if (!error && data) {
         setCategories(data as Category[])
         setCategoriesOffline(false)
+        setCategoriesLoading(false)
         cacheCategories(data as Record<string, unknown>[]).catch(() => {})
       } else {
         const local = await getOfflineCategories()
         setCategories(local as Category[])
         setCategoriesOffline(true)
+        setCategoriesLoading(false)
       }
     } else {
       const local = await getOfflineCategories()
       setCategories(local as Category[])
       setCategoriesOffline(true)
+      setCategoriesLoading(false)
     }
-    setCategoriesLoading(false)
   // supabase is a stable ref — will never change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -357,8 +401,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // ── Derived values ───────────────────────────────────────────────────────
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
-  const expenseCategories = categories.filter((c) => c.type === 'expense')
-  const incomeCategories = categories.filter((c) => c.type === 'income')
+  const expenseCategories = useMemo(() => categories.filter((c) => c.type === 'expense'), [categories])
+  const incomeCategories = useMemo(() => categories.filter((c) => c.type === 'income'), [categories])
   const loading = transactionsLoading || accountsLoading || categoriesLoading
   const isOffline = transactionsOffline || accountsOffline || categoriesOffline
 
