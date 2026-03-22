@@ -53,21 +53,30 @@ function parseBrazilianDate(dateStr: string): string {
 }
 
 function parseCSV(content: string): ParsedTransaction[] {
-  const lines = content.trim().split('\n').filter(l => l.trim())
+  // Strip BOM and normalize line endings
+  const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = normalized.trim().split('\n').filter(l => l.trim())
   if (lines.length < 1) return []
 
-  // Auto-detect separator
-  const firstLine = lines[0]
-  const semicolonCount = (firstLine.match(/;/g) || []).length
-  const commaCount = (firstLine.match(/,/g) || []).length
-  const sep = semicolonCount > commaCount ? ';' : ','
+  // Auto-detect separator using multiple lines for robustness
+  let semicolonTotal = 0
+  let commaTotal = 0
+  const samplesToCheck = Math.min(lines.length, 5)
+  for (let i = 0; i < samplesToCheck; i++) {
+    semicolonTotal += (lines[i].match(/;/g) || []).length
+    commaTotal += (lines[i].match(/,/g) || []).length
+  }
+  const sep = semicolonTotal > commaTotal ? ';' : ','
 
-  // Detect if first line is a header or data (if first field looks like a date, no header)
-  const firstCols = firstLine.split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
+  // Detect if first line is a header or data
+  const firstCols = lines[0].split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
   const hasHeader = !looksLikeDate(firstCols[0])
 
   const transactions: ParsedTransaction[] = []
   const startLine = hasHeader ? 1 : 0
+
+  // Brazilian bank expense keywords (in transaction type column)
+  const expenseKeywords = ['enviado', 'pagamento', 'débito', 'debito', 'compra', 'saque', 'tarifa', 'anuidade', 'iof']
 
   for (let i = startLine; i < lines.length; i++) {
     const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
@@ -75,21 +84,39 @@ function parseCSV(content: string): ParsedTransaction[] {
 
     try {
       const rawDate = cols[0]
-      // Support 4-column format: date;type;description;amount
-      // and 3-column format: date;description;amount
-      const description = cols.length >= 4 ? cols[2] : cols[1]
-      const amountStr = cols[cols.length - 1]
-
       const date = looksLikeDate(rawDate) ? parseBrazilianDate(rawDate) : rawDate
-      const amount = parseFloat(amountStr.replace(/[^\d.,-]/g, '').replace(',', '.'))
 
-      if (!isNaN(amount)) {
-        transactions.push({
-          date,
-          description,
-          amount: Math.abs(amount),
-          type: amount < 0 ? 'expense' : 'income',
-        })
+      if (cols.length >= 4) {
+        // 4-column format: date;transaction_type;name;amount
+        const transactionType = cols[1].toLowerCase()
+        const description = cols[2] || cols[1]
+        const amountStr = cols[cols.length - 1]
+        const amount = parseFloat(amountStr.replace(/[^\d.,-]/g, '').replace(',', '.'))
+
+        if (!isNaN(amount)) {
+          // Determine type from transaction_type column OR from amount sign
+          const isExpense = amount < 0 || expenseKeywords.some(kw => transactionType.includes(kw))
+          transactions.push({
+            date,
+            description,
+            amount: Math.abs(amount),
+            type: isExpense ? 'expense' : 'income',
+          })
+        }
+      } else {
+        // 3-column format: date;description;amount
+        const description = cols[1]
+        const amountStr = cols[2]
+        const amount = parseFloat(amountStr.replace(/[^\d.,-]/g, '').replace(',', '.'))
+
+        if (!isNaN(amount)) {
+          transactions.push({
+            date,
+            description,
+            amount: Math.abs(amount),
+            type: amount < 0 ? 'expense' : 'income',
+          })
+        }
       }
     } catch {
       // Skip malformed rows
