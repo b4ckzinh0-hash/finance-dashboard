@@ -115,7 +115,7 @@ export function TransactionList({ onEdit }: TransactionListProps) {
     const { error } = await deleteTransaction(deletingId)
     setIsDeleting(false)
     if (error) {
-      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' })
+      toast({ title: 'Erro ao excluir', description: (error as { message?: string })?.message ?? 'Erro desconhecido', variant: 'destructive' })
     } else {
       toast({ title: 'Transação excluída', description: 'A transação foi removida com sucesso.' })
     }

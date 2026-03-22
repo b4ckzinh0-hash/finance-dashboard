@@ -315,3 +315,147 @@ CREATE OR REPLACE TRIGGER transactions_updated_at
 CREATE OR REPLACE TRIGGER goals_updated_at
   BEFORE UPDATE ON goals
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Composite indexes for performance
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_type_date ON transactions(user_id, type, date);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_category ON transactions(user_id, category_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_user_active ON accounts(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type);
+CREATE INDEX IF NOT EXISTS idx_recurring_expenses_user_due ON recurring_expenses(user_id, next_due_date);
+CREATE INDEX IF NOT EXISTS idx_goals_user_status ON goals(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
+
+-- Budgets table
+CREATE TABLE IF NOT EXISTS budgets (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  category_id UUID REFERENCES categories(id) ON DELETE CASCADE NOT NULL,
+  amount DECIMAL(12, 2) NOT NULL,
+  month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+  year INTEGER NOT NULL,
+  rollover BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, category_id, month, year)
+);
+
+ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own budgets" ON budgets FOR ALL USING (auth.uid() = user_id);
+CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Tags table
+CREATE TABLE IF NOT EXISTS tags (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(50) NOT NULL,
+  color VARCHAR(7) DEFAULT '#8B5CF6',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own tags" ON tags FOR ALL USING (auth.uid() = user_id);
+
+-- Transaction Tags (N:N)
+CREATE TABLE IF NOT EXISTS transaction_tags (
+  transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE NOT NULL,
+  tag_id UUID REFERENCES tags(id) ON DELETE CASCADE NOT NULL,
+  PRIMARY KEY (transaction_id, tag_id)
+);
+
+ALTER TABLE transaction_tags ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own transaction tags" ON transaction_tags FOR ALL
+  USING (EXISTS (SELECT 1 FROM transactions t WHERE t.id = transaction_id AND t.user_id = auth.uid()));
+
+-- Credit Cards table
+CREATE TABLE IF NOT EXISTS credit_cards (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  limit_amount DECIMAL(12, 2) NOT NULL,
+  closing_day INTEGER NOT NULL CHECK (closing_day BETWEEN 1 AND 31),
+  due_day INTEGER NOT NULL CHECK (due_day BETWEEN 1 AND 31),
+  color VARCHAR(7) DEFAULT '#8B5CF6',
+  icon VARCHAR(50) DEFAULT 'credit-card',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE credit_cards ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own credit cards" ON credit_cards FOR ALL USING (auth.uid() = user_id);
+CREATE TRIGGER update_credit_cards_updated_at BEFORE UPDATE ON credit_cards FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Installments table
+CREATE TABLE IF NOT EXISTS installments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE NOT NULL,
+  credit_card_id UUID REFERENCES credit_cards(id) ON DELETE SET NULL,
+  total_installments INTEGER NOT NULL,
+  current_installment INTEGER NOT NULL,
+  installment_amount DECIMAL(12, 2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE installments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own installments" ON installments FOR ALL
+  USING (EXISTS (SELECT 1 FROM transactions t WHERE t.id = transaction_id AND t.user_id = auth.uid()));
+
+-- Net Worth Snapshots
+CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  date DATE NOT NULL,
+  total_assets DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  total_liabilities DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  net_worth DECIMAL(12, 2) GENERATED ALWAYS AS (total_assets - total_liabilities) STORED,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, date)
+);
+
+ALTER TABLE net_worth_snapshots ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own net worth snapshots" ON net_worth_snapshots FOR ALL USING (auth.uid() = user_id);
+
+-- Automation Rules
+CREATE TABLE IF NOT EXISTS automation_rules (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  condition_type VARCHAR(50) NOT NULL,
+  condition_value TEXT NOT NULL,
+  action_type VARCHAR(50) NOT NULL,
+  action_value TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE automation_rules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own automation rules" ON automation_rules FOR ALL USING (auth.uid() = user_id);
+CREATE TRIGGER update_automation_rules_updated_at BEFORE UPDATE ON automation_rules FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Import History
+CREATE TABLE IF NOT EXISTS import_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  filename VARCHAR(255) NOT NULL,
+  format VARCHAR(10) NOT NULL,
+  records_imported INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE import_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own import history" ON import_history FOR ALL USING (auth.uid() = user_id);
+
+-- Attachments
+CREATE TABLE IF NOT EXISTS attachments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE NOT NULL,
+  file_url TEXT NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  file_size INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own attachments" ON attachments FOR ALL USING (auth.uid() = user_id);

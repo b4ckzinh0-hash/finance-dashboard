@@ -161,7 +161,7 @@ export function TransactionModal({ open, onClose, editingId }: TransactionModalP
   }, [open, editingTransaction, reset])
 
   async function onSubmit(data: ModalFormValues) {
-    let error: Error | null = null
+    let error: { message?: string } | null = null
 
     if (data.type === 'transfer') {
       const result = await transferBetweenAccounts(
@@ -198,7 +198,7 @@ export function TransactionModal({ open, onClose, editingId }: TransactionModalP
     if (error) {
       toast({
         title: 'Erro ao salvar',
-        description: error.message,
+        description: error.message ?? 'Erro desconhecido',
         variant: 'destructive',
       })
     } else {

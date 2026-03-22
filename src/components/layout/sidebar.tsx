@@ -14,18 +14,26 @@ import {
   BarChart3,
   Sparkles,
   Settings,
-  Building2,
+  CreditCard,
+  PiggyBank,
+  TrendingUp,
+  CalendarDays,
+  Upload,
 } from 'lucide-react'
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/transactions', label: 'Transações', icon: ArrowLeftRight },
   { href: '/accounts', label: 'Contas', icon: Wallet },
+  { href: '/credit-cards', label: 'Cartões de Crédito', icon: CreditCard },
   { href: '/categories', label: 'Categorias', icon: Tag },
+  { href: '/budget', label: 'Orçamento', icon: PiggyBank },
+  { href: '/net-worth', label: 'Patrimônio', icon: TrendingUp },
   { href: '/goals', label: 'Metas', icon: Target },
+  { href: '/calendar', label: 'Calendário', icon: CalendarDays },
   { href: '/planning', label: 'Planejamento', icon: Calendar },
+  { href: '/import', label: 'Importar Dados', icon: Upload },
   { href: '/reports', label: 'Relatórios', icon: BarChart3 },
-  { href: '/open-finance', label: 'Open Finance', icon: Building2 },
   { href: '/insights', label: 'Insights IA', icon: Sparkles },
   { href: '/settings', label: 'Configurações', icon: Settings },
 ]
