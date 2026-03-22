@@ -10,6 +10,17 @@ export function usePrivacyMode() {
     const isPrivateStored = stored === 'true'
     setIsPrivate(isPrivateStored)
     document.documentElement.setAttribute('data-privacy', isPrivateStored ? 'true' : 'false')
+
+    // Sync privacy mode state across tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'privacy-mode') {
+        const next = e.newValue === 'true'
+        setIsPrivate(next)
+        document.documentElement.setAttribute('data-privacy', next ? 'true' : 'false')
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
   const toggle = () => {

@@ -156,7 +156,9 @@ export default function ImportPage() {
         status: 'pending',
       })
 
-      setTimeout(() => processFile(file), 100)
+      // Delay to allow React state update to complete before parsing begins
+      const FILE_PARSE_DELAY_MS = 100
+      setTimeout(() => processFile(file), FILE_PARSE_DELAY_MS)
     })
 
     if (newFiles.length > 0) {
@@ -221,7 +223,11 @@ export default function ImportPage() {
           input.type = 'file'
           input.multiple = true
           input.accept = '.csv,.ofx,.qfx'
-          input.onchange = (e) => handleFiles((e.target as HTMLInputElement).files)
+          input.onchange = (e) => {
+            handleFiles((e.target as HTMLInputElement).files)
+            input.remove()
+          }
+          document.body.appendChild(input)
           input.click()
         }}
       >
