@@ -69,8 +69,8 @@ function getBillingPeriod(closingDay: number) {
     end = new Date(nextYear, nextMonth, closingDay)
   }
 
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
-  return { start: fmt(start), end: fmt(end) }
+  const toDateStr = (d: Date) => d.toISOString().split('T')[0]
+  return { start: toDateStr(start), end: toDateStr(end) }
 }
 
 export default function CreditCardsPage() {

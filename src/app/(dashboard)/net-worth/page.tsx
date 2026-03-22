@@ -111,13 +111,13 @@ export default function NetWorthPage() {
   const lastTwo = snapshots.slice(-2)
   const monthlyChange = lastTwo.length === 2 ? lastTwo[1].net_worth - lastTwo[0].net_worth : 0
 
-  // Largest account
-  const largestAccount = accounts.length > 0
-    ? accounts.reduce((a, b) => (a.balance > b.balance ? a : b))
-    : null
-
   const isLoading = accLoading || snapshotsLoading
   const activeAccounts = accounts.filter(a => a.is_active)
+
+  // Largest account (among active accounts only)
+  const largestAccount = activeAccounts.length > 0
+    ? activeAccounts.reduce((a, b) => (a.balance > b.balance ? a : b))
+    : null
 
   return (
     <motion.div
