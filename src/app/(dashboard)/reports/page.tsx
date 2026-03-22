@@ -18,10 +18,9 @@ export default function ReportsPage() {
   const { transactions } = useTransactionsContext()
   const { categories } = useCategoriesContext()
 
-  const now = new Date()
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth())
-  const [selectedMonthYear, setSelectedMonthYear] = useState(now.getFullYear())
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth())
+  const [selectedMonthYear, setSelectedMonthYear] = useState(() => new Date().getFullYear())
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
 
   const monthlyData = useMemo(() => {
     const txs = transactions.filter((t) => {
@@ -60,6 +59,7 @@ export default function ReportsPage() {
   }, [transactions, selectedYear])
 
   const categoryData = useMemo(() => {
+    const now = new Date()
     const txs = transactions.filter((t) => {
       const d = new Date(t.date)
       return t.type === 'expense' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -73,7 +73,7 @@ export default function ReportsPage() {
       })
       .filter((c) => c.amount > 0)
       .sort((a, b) => b.amount - a.amount)
-  }, [transactions, categories, now])
+  }, [transactions, categories])
 
   const prevMonth = () => {
     if (selectedMonth === 0) { setSelectedMonth(11); setSelectedMonthYear((y) => y - 1) }

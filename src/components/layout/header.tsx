@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useAuth } from '@/contexts/auth-context'
+import { usePrivacyMode } from '@/hooks/use-privacy-mode'
 import { getInitials } from '@/lib/utils'
-import { Bell } from 'lucide-react'
+import { Bell, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { UserMenu } from '@/components/layout/user-menu'
@@ -12,6 +13,7 @@ import { UserMenu } from '@/components/layout/user-menu'
 export function Header() {
   const { profile, user } = useAuth()
   const { unreadCount } = useNotifications()
+  const { isPrivate, toggle } = usePrivacyMode()
 
   const displayName = profile?.full_name ?? user?.email ?? ''
   const initials = displayName ? getInitials(displayName) : '?'
@@ -30,6 +32,21 @@ export function Header() {
 
       {/* Right actions */}
       <div className="flex items-center gap-2">
+        {/* Privacy toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggle}
+          title={isPrivate ? 'Mostrar valores' : 'Ocultar valores'}
+        >
+          {isPrivate ? (
+            <EyeOff className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          )}
+          <span className="sr-only">{isPrivate ? 'Mostrar valores' : 'Ocultar valores'}</span>
+        </Button>
+
         {/* Notification bell */}
         <Button variant="ghost" size="icon" className="relative" asChild>
           <Link href="/settings">
