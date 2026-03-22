@@ -1,11 +1,22 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/contexts/auth-context'
+import { useToast } from '@/components/ui/use-toast'
+import { createClient } from '@/lib/supabase/client'
+import type { Account } from '@/types'
 
 interface ParsedTransaction {
   date: string
@@ -28,44 +39,57 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function looksLikeDate(str: string): boolean {
+  return /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str.trim())
+}
+
+function parseBrazilianDate(dateStr: string): string {
+  const parts = dateStr.trim().split('/')
+  if (parts.length === 3) {
+    const [day, month, year] = parts
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+  }
+  return dateStr
+}
+
 function parseCSV(content: string): ParsedTransaction[] {
-  const lines = content.trim().split('\n')
-  if (lines.length < 2) return []
+  const lines = content.trim().split('\n').filter(l => l.trim())
+  if (lines.length < 1) return []
+
+  // Auto-detect separator
+  const firstLine = lines[0]
+  const semicolonCount = (firstLine.match(/;/g) || []).length
+  const commaCount = (firstLine.match(/,/g) || []).length
+  const sep = semicolonCount > commaCount ? ';' : ','
+
+  // Detect if first line is a header or data (if first field looks like a date, no header)
+  const firstCols = firstLine.split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
+  const hasHeader = !looksLikeDate(firstCols[0])
 
   const transactions: ParsedTransaction[] = []
+  const startLine = hasHeader ? 1 : 0
 
-  const header = lines[0].toLowerCase()
-  const isNubank = header.includes('data') && header.includes('descrição') && header.includes('valor')
-
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+  for (let i = startLine; i < lines.length; i++) {
+    const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
     if (cols.length < 3) continue
 
     try {
-      const date = cols[0]
-      const description = cols[1]
-      const amountStr = cols[2]
+      const rawDate = cols[0]
+      // Support 4-column format: date;type;description;amount
+      // and 3-column format: date;description;amount
+      const description = cols.length >= 4 ? cols[2] : cols[1]
+      const amountStr = cols[cols.length - 1]
 
-      if (isNubank) {
-        const amount = parseFloat(amountStr.replace(/[^\d.,-]/g, '').replace(',', '.'))
-        if (!isNaN(amount)) {
-          transactions.push({
-            date,
-            description,
-            amount: Math.abs(amount),
-            type: amount < 0 ? 'expense' : 'income',
-          })
-        }
-      } else {
-        const amount = parseFloat(amountStr.replace(/[^\d.,-]/g, '').replace(',', '.'))
-        if (!isNaN(amount)) {
-          transactions.push({
-            date,
-            description,
-            amount: Math.abs(amount),
-            type: amount < 0 ? 'expense' : 'income',
-          })
-        }
+      const date = looksLikeDate(rawDate) ? parseBrazilianDate(rawDate) : rawDate
+      const amount = parseFloat(amountStr.replace(/[^\d.,-]/g, '').replace(',', '.'))
+
+      if (!isNaN(amount)) {
+        transactions.push({
+          date,
+          description,
+          amount: Math.abs(amount),
+          type: amount < 0 ? 'expense' : 'income',
+        })
       }
     } catch {
       // Skip malformed rows
@@ -106,8 +130,100 @@ function parseOFX(content: string): ParsedTransaction[] {
 }
 
 export default function ImportPage() {
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const supabase = useRef(createClient()).current
+
   const [files, setFiles] = useState<ImportFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
+  const [isImporting, setIsImporting] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('accounts')
+      .select('*')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => {
+        if (data) setAccounts(data as Account[])
+      })
+  }, [user, supabase])
+
+  const handleImportAll = useCallback(async () => {
+    if (!user || !selectedAccountId) return
+
+    setIsImporting(true)
+    try {
+      // Fetch default categories for income and expense
+      const { data: categoriesData } = await supabase
+        .from('categories')
+        .select('id, type')
+        .eq('user_id', user.id)
+
+      const incomeCategory = categoriesData?.find(c => c.type === 'income')
+      const expenseCategory = categoriesData?.find(c => c.type === 'expense')
+
+      if (!incomeCategory && !expenseCategory) {
+        throw new Error('Nenhuma categoria encontrada. Crie categorias antes de importar.')
+      }
+
+      const previewFiles = files.filter(f => f.status === 'preview')
+      let totalImported = 0
+
+      for (const file of previewFiles) {
+        if (!file.transactions?.length) continue
+
+        const rows = file.transactions.map(t => ({
+          user_id: user.id,
+          account_id: selectedAccountId,
+          category_id: t.type === 'income'
+            ? (incomeCategory?.id ?? expenseCategory?.id)
+            : (expenseCategory?.id ?? incomeCategory?.id),
+          type: t.type,
+          amount: t.amount,
+          description: t.description,
+          date: t.date,
+          payment_method: 'other' as const,
+        }))
+
+        const { error: insertError } = await supabase
+          .from('transactions')
+          .insert(rows)
+
+        if (insertError) throw insertError
+
+        // Save import history
+        await supabase.from('import_history').insert({
+          user_id: user.id,
+          filename: file.name,
+          format: (file.name.split('.').pop() ?? 'csv').slice(0, 10).toUpperCase(),
+          records_imported: file.transactions.length,
+        })
+
+        totalImported += file.transactions.length
+
+        setFiles(prev => prev.map(f =>
+          f.name === file.name ? { ...f, status: 'imported' } : f
+        ))
+      }
+
+      toast({
+        title: 'Importação concluída!',
+        description: `${totalImported} transações importadas com sucesso.`,
+      })
+    } catch (err) {
+      toast({
+        title: 'Erro ao importar',
+        description: (err as Error).message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }, [user, selectedAccountId, files, supabase, toast])
 
   const processFile = useCallback(async (file: File) => {
     setFiles(prev => prev.map(f =>
@@ -270,21 +386,16 @@ export default function ImportPage() {
                   <p className="text-xs text-red-400 mt-2">{file.error}</p>
                 )}
                 {file.status === 'preview' && file.transactions && file.transactions.length > 0 && (
-                  <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-                    {file.transactions.slice(0, 5).map((t, i) => (
+                  <div className="mt-3 space-y-1 max-h-96 overflow-y-auto">
+                    {file.transactions.map((t, i) => (
                       <div key={i} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/20">
-                        <span className="text-muted-foreground">{t.date}</span>
+                        <span className="text-muted-foreground shrink-0">{t.date}</span>
                         <span className="truncate mx-2 max-w-[200px]">{t.description}</span>
-                        <span className={t.type === 'income' ? 'text-emerald-400' : 'text-red-400'}>
+                        <span className={cn('shrink-0', t.type === 'income' ? 'text-emerald-400' : 'text-red-400')}>
                           {t.type === 'income' ? '+' : '-'}R$ {t.amount.toFixed(2)}
                         </span>
                       </div>
                     ))}
-                    {file.transactions.length > 5 && (
-                      <p className="text-xs text-muted-foreground text-center py-1">
-                        e mais {file.transactions.length - 5} transações…
-                      </p>
-                    )}
                   </div>
                 )}
               </CardContent>
@@ -292,15 +403,40 @@ export default function ImportPage() {
           ))}
 
           {previewFiles.length > 0 && (
-            <div className="flex items-center justify-between p-4 rounded-xl bg-violet-500/10 border border-violet-500/20">
-              <p className="text-sm">
-                <span className="font-semibold text-violet-400">{totalTransactions} transações</span>
-                {' '}prontas para importar
-              </p>
-              <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
-                <Upload className="h-4 w-4 mr-2" />
-                Importar Tudo
-              </Button>
+            <div className="space-y-3 p-4 rounded-xl bg-violet-500/10 border border-violet-500/20">
+              <div className="flex items-center justify-between">
+                <p className="text-sm">
+                  <span className="font-semibold text-violet-400">{totalTransactions} transações</span>
+                  {' '}prontas para importar
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                  <SelectTrigger className="flex-1 bg-background/50 border-border/50">
+                    <SelectValue placeholder="Selecione a conta de destino…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.icon} {acc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  className="bg-violet-600 hover:bg-violet-700 shrink-0"
+                  disabled={!selectedAccountId || isImporting}
+                  onClick={handleImportAll}
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {isImporting ? 'Importando…' : 'Importar Tudo'}
+                </Button>
+              </div>
             </div>
           )}
         </div>
