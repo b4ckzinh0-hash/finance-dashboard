@@ -7,10 +7,9 @@ export function usePrivacyMode() {
 
   useEffect(() => {
     const stored = localStorage.getItem('privacy-mode')
-    if (stored === 'true') {
-      setIsPrivate(true)
-      document.documentElement.setAttribute('data-privacy', 'true')
-    }
+    const isPrivateStored = stored === 'true'
+    setIsPrivate(isPrivateStored)
+    document.documentElement.setAttribute('data-privacy', isPrivateStored ? 'true' : 'false')
   }, [])
 
   const toggle = () => {
